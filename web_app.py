@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Legal Document Anonymizer - Web UI
-法律文档脱敏工具 - Web 界面
+Legal Anonymizer - browser interface
 
 Usage:
     python3 web_app.py
@@ -9,7 +9,7 @@ Usage:
 """
 
 import os
-# 禁用 PaddleOCR 启动时的网络连通性检测（会阻塞数十秒）
+# Disable PaddleOCR's network connectivity check at startup (it can block for tens of seconds)
 os.environ.setdefault('PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK', 'True')
 
 import sys
@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# 确保模块路径
+# Make sure the module path is available
 sys.path.insert(0, str(Path(__file__).parent))
 
 from flask import Flask, request, jsonify, send_file, render_template
@@ -30,7 +30,7 @@ from anonymizer import LegalAnonymizer
 
 
 def is_scanned_pdf(file_path: str) -> bool:
-    """检测PDF是否为扫描版（文本内容极少）"""
+    """Detect whether a PDF is a scanned document (almost no text content)."""
     try:
         import fitz
         doc = fitz.open(file_path)
@@ -48,7 +48,7 @@ def is_scanned_pdf(file_path: str) -> bool:
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 
-# 目录配置
+# Directory configuration
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / 'uploads'
 OUTPUT_DIR = BASE_DIR / 'output'
@@ -60,7 +60,7 @@ for d in [UPLOAD_DIR, OUTPUT_DIR, INBOX_DIR]:
 
 
 def load_user_dict() -> list:
-    """加载持久化用户词典"""
+    """Load the persisted user dictionary."""
     if USER_DICT_PATH.exists():
         try:
             with open(USER_DICT_PATH, 'r', encoding='utf-8') as f:
@@ -71,22 +71,22 @@ def load_user_dict() -> list:
 
 
 def save_user_dict(entries: list):
-    """保存用户词典到磁盘"""
+    """Save the user dictionary to disk."""
     with open(USER_DICT_PATH, 'w', encoding='utf-8') as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)
 
-# 支持的文件格式
+# Supported file formats
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.txt', '.md', '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp'}
 
-# 会话存储（内存，单用户本地使用）
+# Session store (in memory, for single-user local use)
 sessions: Dict[str, dict] = {}
 
-# 会话超时时间（2小时）
+# Session timeout (2 hours)
 SESSION_TIMEOUT = 7200
 
 
 def cleanup_sessions():
-    """清理过期会话"""
+    """Remove expired sessions."""
     now = time.time()
     expired = [sid for sid, s in sessions.items() if now - s['created_at'] > SESSION_TIMEOUT]
     for sid in expired:
@@ -95,11 +95,11 @@ def cleanup_sessions():
 
 
 def _cleanup_session_files(session_id: str):
-    """清理会话相关文件"""
+    """Clean up files associated with a session."""
     session = sessions.get(session_id)
     if not session:
         return
-    # 清理上传文件（仅清理从 inbox 复制过来的副本）
+    # Clean up the uploaded file (only the copy made from inbox)
     upload_path = session.get('upload_path')
     if upload_path and Path(upload_path).exists() and str(UPLOAD_DIR) in str(upload_path):
         try:
@@ -109,7 +109,7 @@ def _cleanup_session_files(session_id: str):
 
 
 def create_session(file_path: str, file_name: str) -> dict:
-    """创建新会话"""
+    """Create a new session."""
     cleanup_sessions()
 
     session_id = str(uuid.uuid4())[:8]
@@ -139,33 +139,33 @@ def create_session(file_path: str, file_name: str) -> dict:
     return session
 
 
-# ==================== 页面路由 ====================
+# ==================== Page routes ====================
 
 @app.route('/')
 def index():
-    # 启动脚本根据用户首次选择写入 ENABLE_OPENAI=0/1，未启用时前端隐藏 OpenAI 开关
+    # The launch script writes ENABLE_OPENAI=0/1 based on the user's first-run choice; when disabled the front end hides the OpenAI toggle
     enable_openai = os.environ.get('ENABLE_OPENAI', '0') == '1'
     return render_template('index.html', enable_openai=enable_openai)
 
 
-# ==================== API 路由 ====================
+# ==================== API routes ====================
 
 @app.route('/api/types', methods=['GET'])
 def get_types():
-    """获取所有支持的实体类型"""
+    """Get all supported entity types."""
     anonymizer = LegalAnonymizer()
     types = anonymizer.get_supported_types()
-    # 补充自动检测类型
+    # Add the auto-detected types
     auto_types = {
-        'person': '人名',
-        'company': '公司名',
-        'law_firm': '律师事务所',
-        'court': '法院',
-        'government': '政府机关',
-        'institution': '机构',
-        'bank_name': '银行',
-        'address': '地址',
-        'other': '其他',
+        'person': 'Person name',
+        'company': 'Company',
+        'law_firm': 'Law firm',
+        'court': 'Court',
+        'government': 'Government',
+        'institution': 'Institution',
+        'bank_name': 'Bank',
+        'address': 'Address',
+        'other': 'Other',
     }
     types.update(auto_types)
     return jsonify({'types': types})
@@ -173,26 +173,26 @@ def get_types():
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
-    """上传文件"""
+    """Upload a file."""
     if 'file' not in request.files:
-        return jsonify({'error': '未选择文件'}), 400
+        return jsonify({'error': 'No file selected'}), 400
 
     file = request.files['file']
     if not file.filename:
-        return jsonify({'error': '文件名为空'}), 400
+        return jsonify({'error': 'File name is empty'}), 400
 
     suffix = Path(file.filename).suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
-        return jsonify({'error': f'不支持的文件格式: {suffix}'}), 400
+        return jsonify({'error': f'Unsupported file format: {suffix}'}), 400
 
-    # 保存上传文件
+    # Save the uploaded file
     safe_name = f"{uuid.uuid4().hex[:8]}_{file.filename}"
     save_path = UPLOAD_DIR / safe_name
     file.save(str(save_path))
 
     session = create_session(str(save_path), file.filename)
 
-    # 检测扫描版PDF
+    # Detect scanned PDF
     is_scanned = False
     if session['is_pdf']:
         is_scanned = is_scanned_pdf(str(save_path))
@@ -210,7 +210,7 @@ def upload_file():
 
 @app.route('/api/inbox', methods=['GET'])
 def list_inbox():
-    """列出 inbox 文件夹中的文件"""
+    """List the files in the inbox folder."""
     files = []
     for f in sorted(INBOX_DIR.iterdir()):
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith('.'):
@@ -230,24 +230,24 @@ def list_inbox():
 
 @app.route('/api/inbox/select', methods=['POST'])
 def select_inbox_file():
-    """从 inbox 选择文件"""
+    """Select a file from the inbox."""
     data = request.get_json()
     filename = data.get('filename')
     if not filename:
-        return jsonify({'error': '未指定文件名'}), 400
+        return jsonify({'error': 'No file name specified'}), 400
 
     source_path = INBOX_DIR / filename
     if not source_path.exists():
-        return jsonify({'error': '文件不存在'}), 404
+        return jsonify({'error': 'File does not exist'}), 404
 
-    # 复制到 uploads（不修改原文件）
+    # Copy to uploads (the original file is left untouched)
     safe_name = f"{uuid.uuid4().hex[:8]}_{filename}"
     dest_path = UPLOAD_DIR / safe_name
     shutil.copy2(str(source_path), str(dest_path))
 
     session = create_session(str(dest_path), filename)
 
-    # 检测扫描版PDF
+    # Detect scanned PDF
     is_scanned = False
     if session['is_pdf']:
         is_scanned = is_scanned_pdf(str(dest_path))
@@ -265,7 +265,7 @@ def select_inbox_file():
 
 def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
                          use_cn_llm: bool, use_llm: bool):
-    """后台线程跑单文件 OCR + 检测，期间更新 session['analyze_progress']"""
+    """Background thread that runs single-file OCR + detection, updating session['analyze_progress'] as it goes."""
     session = sessions.get(session_id)
     if not session:
         return
@@ -273,7 +273,7 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
     progress['stage'] = 'ocr'
     progress['started_at'] = time.time()
 
-    # 计算 ETA：扫描版按页数预估，文字版很快
+    # Estimate the ETA: scanned PDFs are estimated by page count, text PDFs are fast
     fp = session['file_path']
     progress['eta_s'] = _estimate_eta(fp, use_ocr) if Path(fp).suffix.lower() == '.pdf' else 5.0
 
@@ -281,7 +281,7 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
         progress['stage'] = stage
         progress['current'] = current
         progress['total'] = max(total, 1)
-        progress['percent'] = round(current / max(total, 1) * 90, 1)  # OCR 占总流程 90%
+        progress['percent'] = round(current / max(total, 1) * 90, 1)  # OCR accounts for 90% of the overall process
 
     try:
         anonymizer = LegalAnonymizer(use_cn_llm=use_cn_llm, use_llm=use_llm)
@@ -295,7 +295,7 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
         session['text'] = text
         if not text.strip():
             progress['stage'] = 'error'
-            progress['error'] = '文件内容为空，如果是扫描版 PDF 请启用 OCR'
+            progress['error'] = 'The file has no content. If this is a scanned PDF, please enable OCR.'
             progress['percent'] = 100
             return
 
@@ -304,7 +304,7 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
         all_entities = anonymizer._detect_all(text)
         session['auto_entities'] = all_entities
 
-        # 整理 findings
+        # Organize findings
         CONTEXT_WINDOW = 40
         findings, seen = {}, {}
         for entity_text, entity_type, pos in all_entities:
@@ -320,9 +320,9 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
 
         type_names = anonymizer.pattern_detector.type_names.copy()
         type_names.update({
-            'person': '人名', 'company': '公司名', 'law_firm': '律师事务所',
-            'court': '法院', 'government': '政府机关', 'institution': '机构',
-            'bank_name': '银行', 'address': '地址',
+            'person': 'Person name', 'company': 'Company', 'law_firm': 'Law firm',
+            'court': 'Court', 'government': 'Government', 'institution': 'Institution',
+            'bank_name': 'Bank', 'address': 'Address',
         })
         progress['result'] = {
             'findings': findings,
@@ -344,7 +344,7 @@ def _run_single_analyze(session_id: str, use_ocr: bool, ocr_engine: str,
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_document():
-    """启动单文件分析（异步）。调用后立即返回，前端轮询 /api/analyze/status"""
+    """Start single-file analysis (async). Returns immediately; the front end polls /api/analyze/status."""
     data = request.get_json()
     session_id = data.get('session_id')
     use_ocr = data.get('use_ocr', False)
@@ -354,7 +354,7 @@ def analyze_document():
 
     session = sessions.get(session_id)
     if not session:
-        return jsonify({'error': '会话不存在或已过期'}), 404
+        return jsonify({'error': 'Session does not exist or has expired'}), 404
 
     session['use_ocr'] = use_ocr
     session['ocr_engine'] = ocr_engine
@@ -376,10 +376,10 @@ def analyze_document():
 
 @app.route('/api/analyze/status/<session_id>', methods=['GET'])
 def analyze_status(session_id):
-    """查询单文件分析进度"""
+    """Query the progress of single-file analysis."""
     session = sessions.get(session_id)
     if not session or 'analyze_progress' not in session:
-        return jsonify({'error': '会话不存在或未开始分析'}), 404
+        return jsonify({'error': 'Session does not exist or analysis has not started'}), 404
     p = session['analyze_progress']
     now = time.time()
     payload = {
@@ -403,14 +403,14 @@ def analyze_status(session_id):
 
 @app.route('/api/entities', methods=['POST'])
 def manage_entities():
-    """管理自定义实体"""
+    """Manage custom entities."""
     data = request.get_json()
     session_id = data.get('session_id')
     action = data.get('action', 'add')  # add, remove, set
 
     session = sessions.get(session_id)
     if not session:
-        return jsonify({'error': '会话不存在或已过期'}), 404
+        return jsonify({'error': 'Session does not exist or has expired'}), 404
 
     entities = data.get('entities', [])
 
@@ -433,7 +433,7 @@ def manage_entities():
 
 @app.route('/api/anonymize', methods=['POST'])
 def anonymize_document():
-    """执行脱敏"""
+    """Run anonymization."""
     data = request.get_json()
     session_id = data.get('session_id')
     output_format = data.get('output_format', 'docx')
@@ -442,10 +442,10 @@ def anonymize_document():
 
     session = sessions.get(session_id)
     if not session:
-        return jsonify({'error': '会话不存在或已过期'}), 404
+        return jsonify({'error': 'Session does not exist or has expired'}), 404
 
     if not session.get('text'):
-        return jsonify({'error': '请先分析文档'}), 400
+        return jsonify({'error': 'Please analyze the document first'}), 400
 
     try:
         anonymizer = LegalAnonymizer(
@@ -453,30 +453,30 @@ def anonymize_document():
             use_llm=session.get('use_llm', False),
         )
 
-        # 设置掩码策略；whitebox 是占位符策略 + PDF 渲染时不画文字
+        # Set the mask strategy; whitebox is the placeholder strategy plus no text drawn when rendering the PDF
         pdf_whitebox = (mask_strategy == 'whitebox')
         effective_strategy = 'placeholder' if pdf_whitebox else mask_strategy
         if effective_strategy:
             anonymizer.set_all_mask_strategy(effective_strategy)
 
-        # 占位符风格：'auto' 时根据文本中 CJK 占比自动选；whitebox 模式不画文字所以风格无关紧要
+        # Placeholder style: when 'auto', pick automatically based on the CJK ratio in the text; in whitebox mode no text is drawn so the style is irrelevant
         placeholder_style = _resolve_placeholder_style(
             data.get('placeholder_style', 'auto'),
             session.get('text', '') or '',
         )
         anonymizer.set_placeholder_style(placeholder_style)
 
-        # 注入用户词典 + 会话自定义实体
+        # Inject the user dictionary plus the session's custom entities
         user_dict = load_user_dict()
         if user_dict:
             anonymizer.add_custom_entities(user_dict)
         if session['custom_entities']:
             anonymizer.add_custom_entities(session['custom_entities'])
 
-        # 重新检测实体
+        # Re-detect entities
         all_entities = anonymizer._detect_all(session['text'])
 
-        # 过滤掉用户排除的实体
+        # Filter out the entities the user excluded
         if excluded_entities:
             excluded_set = {(e['type'], e['name']) for e in excluded_entities}
             all_entities = [
@@ -484,21 +484,21 @@ def anonymize_document():
                 if (etype, text) not in excluded_set
             ]
 
-        # 执行掩码
+        # Apply masking
         anonymizer.masker.reset()
         anonymized_text, detailed_mapping = anonymizer.masker.mask_all(session['text'], all_entities)
 
-        # 保存脱敏后文本到 session，供后续"继续脱敏"使用
+        # Save the anonymized text to the session for a later "continue anonymizing" pass
         session['anonymized_text'] = anonymized_text
         session['detailed_mapping'] = detailed_mapping
 
-        # 生成输出文件名
+        # Build the output file name
         orig_stem = Path(session['file_name']).stem
         output_name = f"{orig_stem}_anonymized"
         output_path = OUTPUT_DIR / f"{session['id']}_{output_name}"
         input_suffix = Path(session['file_name']).suffix.lower()
 
-        # 归一化 output_format 为 list
+        # Normalize output_format to a list
         if isinstance(output_format, str):
             formats = [output_format]
         elif isinstance(output_format, (list, tuple)):
@@ -520,19 +520,19 @@ def anonymize_document():
             )
             saved_files.extend(files)
 
-        # 保存映射表
+        # Save the mapping table
         mapping_path = OUTPUT_DIR / f"{session['id']}_{output_name}_mapping.json"
         anonymizer.processor.write_mapping(detailed_mapping, str(mapping_path))
         saved_files.append(('mapping_file', str(mapping_path)))
 
-        # 确定主输出文件
+        # Determine the main output file
         main_output = None
         for key, path in saved_files:
             if key.startswith('output_'):
                 main_output = path
                 break
 
-        # 收集每种输出格式 → 路径的映射
+        # Collect the mapping of each output format -> path
         output_files = {}
         for key, path in saved_files:
             if key.startswith('output_'):
@@ -569,25 +569,25 @@ def anonymize_document():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'脱敏失败: {str(e)}'}), 500
+        return jsonify({'error': f'Anonymization failed: {str(e)}'}), 500
 
 
 @app.route('/api/re-anonymize', methods=['POST'])
 def re_anonymize_document():
-    """继续脱敏：用户发现残留敏感信息后，添加新实体再次脱敏"""
+    """Continue anonymizing: after the user spots residual sensitive information, add new entities and anonymize again."""
     data = request.get_json()
     session_id = data.get('session_id')
-    new_entities = data.get('entities', [])  # [{"type": "company", "name": "源德盛"}, ...]
+    new_entities = data.get('entities', [])  # [{"type": "company", "name": "Acme Corp"}, ...]
 
     session = sessions.get(session_id)
     if not session:
-        return jsonify({'error': '会话不存在或已过期'}), 404
+        return jsonify({'error': 'Session does not exist or has expired'}), 404
 
     if not session.get('text'):
-        return jsonify({'error': '请先分析并脱敏文档'}), 400
+        return jsonify({'error': 'Please analyze and anonymize the document first'}), 400
 
     if not new_entities:
-        return jsonify({'error': '请至少添加一个需脱敏的实体'}), 400
+        return jsonify({'error': 'Please add at least one entity to anonymize'}), 400
 
     try:
         anonymizer = LegalAnonymizer(
@@ -595,17 +595,17 @@ def re_anonymize_document():
             use_llm=session.get('use_llm', False),
         )
 
-        # 注入用户词典
+        # Inject the user dictionary
         user_dict = load_user_dict()
         if user_dict:
             anonymizer.add_custom_entities(user_dict)
 
-        # 恢复之前的自定义实体 + 添加新实体
+        # Restore the previous custom entities and add the new ones
         all_custom = session.get('custom_entities', []) + new_entities
         session['custom_entities'] = all_custom
         anonymizer.add_custom_entities(all_custom)
 
-        # 获取之前的掩码策略和排除列表
+        # Retrieve the previous mask strategy and exclusion list
         mask_strategy = session.get('last_mask_strategy', 'placeholder')
         output_format = session.get('output_format', 'docx')
         excluded_entities = session.get('last_excluded_entities', [])
@@ -615,10 +615,10 @@ def re_anonymize_document():
         if effective_strategy:
             anonymizer.set_all_mask_strategy(effective_strategy)
 
-        # 用原始文本重新检测全部实体
+        # Re-detect all entities from the original text
         all_entities = anonymizer._detect_all(session['text'])
 
-        # 过滤排除的
+        # Filter out the excluded ones
         if excluded_entities:
             excluded_set = {(e['type'], e['name']) for e in excluded_entities}
             all_entities = [
@@ -626,14 +626,14 @@ def re_anonymize_document():
                 if (etype, text) not in excluded_set
             ]
 
-        # 重新执行掩码
+        # Re-apply masking
         anonymizer.masker.reset()
         anonymized_text, detailed_mapping = anonymizer.masker.mask_all(session['text'], all_entities)
 
         session['anonymized_text'] = anonymized_text
         session['detailed_mapping'] = detailed_mapping
 
-        # 重新写入文件（覆盖之前的输出）
+        # Rewrite the files (overwriting the previous output)
         orig_stem = Path(session['file_name']).stem
         output_name = f"{orig_stem}_anonymized"
         output_path = OUTPUT_DIR / f"{session['id']}_{output_name}"
@@ -660,12 +660,12 @@ def re_anonymize_document():
             )
             saved_files.extend(files)
 
-        # 更新映射表
+        # Update the mapping table
         mapping_path = OUTPUT_DIR / f"{session['id']}_{output_name}_mapping.json"
         anonymizer.processor.write_mapping(detailed_mapping, str(mapping_path))
         saved_files.append(('mapping_file', str(mapping_path)))
 
-        # 构建 output_paths（每种格式 → 文件路径），前端用来生成多个下载按钮
+        # Build output_paths (each format -> file path); the front end uses this to render multiple download buttons
         output_files = {}
         main_output = None
         for key, path in saved_files:
@@ -702,17 +702,17 @@ def re_anonymize_document():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'继续脱敏失败: {str(e)}'}), 500
+        return jsonify({'error': f'Continued anonymization failed: {str(e)}'}), 500
 
 
 def _anonymize_filename(session: dict) -> str:
-    """对文件名中的敏感信息也做脱敏替换"""
+    """Apply the same anonymization to sensitive information in the file name."""
     orig_stem = Path(session['file_name']).stem
     mapping = session.get('detailed_mapping', {}).get('mapping', {})
     if not mapping:
         return orig_stem
 
-    # 构建替换表：原始值 -> 占位符，按长度降序
+    # Build the replacement table: original value -> placeholder, in descending length order
     replacements = {}
     for placeholder, info in mapping.items():
         original = info.get('original', '')
@@ -728,10 +728,10 @@ def _anonymize_filename(session: dict) -> str:
 
 @app.route('/api/download/<session_id>', methods=['GET'])
 def download_file(session_id):
-    """下载脱敏后的文件。可选 ?fmt=docx/pdf/md/txt 指定格式。"""
+    """Download the anonymized file. An optional ?fmt=docx/pdf/md/txt selects the format."""
     session = sessions.get(session_id)
     if not session:
-        return jsonify({'error': '文件不存在'}), 404
+        return jsonify({'error': 'File does not exist'}), 404
 
     fmt = request.args.get('fmt', '').lower()
     target_path = None
@@ -740,15 +740,15 @@ def download_file(session_id):
     if not target_path:
         target_path = session.get('output_path')
     if not target_path:
-        return jsonify({'error': '文件不存在'}), 404
+        return jsonify({'error': 'File does not exist'}), 404
 
     output_path = Path(target_path)
     if not output_path.exists():
-        return jsonify({'error': '输出文件不存在'}), 404
+        return jsonify({'error': 'Output file does not exist'}), 404
 
-    # 构造下载文件名（文件名也脱敏）
+    # Build the download file name (the file name is anonymized too)
     anonymized_stem = _anonymize_filename(session)
-    download_name = f"{anonymized_stem}_脱敏版{output_path.suffix}"
+    download_name = f"{anonymized_stem}_anonymized{output_path.suffix}"
 
     return send_file(
         str(output_path),
@@ -759,17 +759,17 @@ def download_file(session_id):
 
 @app.route('/api/download-mapping/<session_id>', methods=['GET'])
 def download_mapping(session_id):
-    """下载映射表"""
+    """Download the mapping table."""
     session = sessions.get(session_id)
     if not session or not session.get('mapping_path'):
-        return jsonify({'error': '映射表不存在'}), 404
+        return jsonify({'error': 'Mapping table does not exist'}), 404
 
     mapping_path = Path(session['mapping_path'])
     if not mapping_path.exists():
-        return jsonify({'error': '映射表文件不存在'}), 404
+        return jsonify({'error': 'Mapping table file does not exist'}), 404
 
     anonymized_stem = _anonymize_filename(session)
-    download_name = f"{anonymized_stem}_映射表.json"
+    download_name = f"{anonymized_stem}_mapping.json"
 
     return send_file(
         str(mapping_path),
@@ -780,14 +780,14 @@ def download_mapping(session_id):
 
 @app.route('/api/user-dict', methods=['GET'])
 def get_user_dict():
-    """获取用户词典"""
+    """Get the user dictionary."""
     entries = load_user_dict()
     return jsonify({'entries': entries, 'count': len(entries)})
 
 
 @app.route('/api/user-dict/add', methods=['POST'])
 def add_user_dict():
-    """向用户词典添加词条"""
+    """Add entries to the user dictionary."""
     data = request.get_json()
     new_entries = data.get('entries', [])
     current = load_user_dict()
@@ -802,7 +802,7 @@ def add_user_dict():
 
 @app.route('/api/user-dict/remove', methods=['POST'])
 def remove_user_dict():
-    """从用户词典删除词条"""
+    """Remove entries from the user dictionary."""
     data = request.get_json()
     to_remove = data.get('entries', [])
     current = load_user_dict()
@@ -814,29 +814,29 @@ def remove_user_dict():
 
 @app.route('/api/user-dict/clear', methods=['POST'])
 def clear_user_dict():
-    """清空用户词典"""
+    """Clear the user dictionary."""
     save_user_dict([])
     return jsonify({'entries': [], 'count': 0})
 
 
-# ==================== 批量处理 ====================
+# ==================== Batch processing ====================
 
-# 批次状态：batch_id -> {created_at, items: [...], done, total}
+# Batch state: batch_id -> {created_at, items: [...], done, total}
 batches: Dict[str, dict] = {}
-BATCH_TIMEOUT = 7200  # 2 小时
+BATCH_TIMEOUT = 7200  # 2 hours
 
 
 def _cleanup_batches():
     now = time.time()
     expired = [bid for bid, b in batches.items() if now - b['created_at'] > BATCH_TIMEOUT]
     for bid in expired:
-        # 不再清理输出文件，让用户来得及取回
+        # Do not clean up output files, so the user has time to retrieve them
         del batches[bid]
 
 
 def _detect_placeholder_style(text: str) -> str:
-    """根据文本字符分布自动选占位符风格：CJK ≥ 拉丁用中文，否则英文。
-    本工具面向中文法律场景，文本不足时默认中文。"""
+    """Pick the placeholder style automatically from the text's character distribution: Chinese when CJK >= Latin, otherwise English.
+    This tool targets Chinese legal scenarios, so it defaults to Chinese when there is not enough text."""
     if not text:
         return 'chinese_bracket'
     cjk = sum(1 for c in text if '一' <= c <= '鿿')
@@ -848,7 +848,7 @@ def _detect_placeholder_style(text: str) -> str:
 
 
 def _peek_file_text(file_path: str, max_chars: int = 3000) -> str:
-    """快速取文件前几页/前几段文字（不跑 OCR）用于语言判断"""
+    """Quickly grab the first few pages/paragraphs of text (without running OCR) for language detection."""
     try:
         suffix = Path(file_path).suffix.lower()
         if suffix == '.pdf':
@@ -874,18 +874,18 @@ def _peek_file_text(file_path: str, max_chars: int = 3000) -> str:
 
 
 def _resolve_placeholder_style(requested: str, text: str = '') -> str:
-    """把 'auto' 解析成具体风格；其它值原样返回"""
+    """Resolve 'auto' to a concrete style; any other value is returned as-is."""
     if requested == 'auto':
         return _detect_placeholder_style(text)
     return requested or 'chinese_bracket'
 
 
 def _estimate_eta(file_path: str, is_scanned: bool) -> float:
-    """根据文件类型/大小预估处理秒数（保守估计）"""
+    """Estimate the processing time in seconds based on file type/size (a conservative estimate)."""
     suffix = Path(file_path).suffix.lower()
     size_kb = os.path.getsize(file_path) / 1024
     if suffix == '.pdf':
-        # 用页数判断更准；扫描版 OCR 慢约 12-15s/页，文字版 PDF 约 0.5-1s/页
+        # Page count gives a more accurate estimate; scanned OCR is slow at about 12-15s/page, text PDFs about 0.5-1s/page
         try:
             import fitz
             pages = len(fitz.open(file_path))
@@ -902,7 +902,7 @@ def _estimate_eta(file_path: str, is_scanned: bool) -> float:
 
 
 def _process_batch_item(batch_id: str, item: dict, options: dict):
-    """单个文件脱敏（在后台线程里跑）"""
+    """Anonymize a single file (runs in a background thread)."""
     try:
         item['status'] = 'processing'
         item['stage'] = 'detect'
@@ -912,26 +912,26 @@ def _process_batch_item(batch_id: str, item: dict, options: dict):
             use_cn_llm=options.get('use_cn_llm', False),
             use_llm=options.get('use_llm', False),
         )
-        # whitebox 模式仍然用 placeholder 策略生成文本占位符（[PERSON_1]等），
-        # 但会传 pdf_whitebox=True 让 PDF 输出层不画文字、只留白框
+        # In whitebox mode it still uses the placeholder strategy to generate text placeholders ([PERSON_1] etc.),
+        # but passes pdf_whitebox=True so the PDF output layer draws no text and leaves only white boxes
         strategy = options.get('mask_strategy', 'placeholder')
         pdf_whitebox = (strategy == 'whitebox')
         anonymizer.set_all_mask_strategy('placeholder' if pdf_whitebox else strategy)
-        # 占位符风格：'auto' 时按文件内容判断中/英；whitebox 不画文字所以风格无关
+        # Placeholder style: when 'auto', detect Chinese/English from the file content; whitebox draws no text so the style is irrelevant
         sample = _peek_file_text(item['file_path']) if not pdf_whitebox else ''
         ph_style = _resolve_placeholder_style(
             options.get('placeholder_style', 'auto'), sample
         )
         anonymizer.set_placeholder_style(ph_style)
 
-        # 注入用户词典
+        # Inject the user dictionary
         ud = load_user_dict()
         if ud:
             anonymizer.add_custom_entities(ud)
 
         input_path = Path(item['file_path'])
-        # input_path.stem 已经带了 batch_<id>_NN_ 前缀（来自 upload 时的 safe_name），
-        # 这里取原始文件名的 stem 避免重复前缀
+        # input_path.stem already carries the batch_<id>_NN_ prefix (from the safe_name used at upload time),
+        # so use the stem of the original file name here to avoid a duplicated prefix
         orig_stem = Path(item['name']).stem
         output_stem = OUTPUT_DIR / f"batch_{batch_id}_{item['idx']:02d}_{orig_stem}"
 
@@ -957,7 +957,7 @@ def _process_batch_item(batch_id: str, item: dict, options: dict):
             return
 
         info = result.get('result', {})
-        # 收集所有输出文件（output_pdf / output_docx / mapping_file / text_backup）
+        # Collect all output files (output_pdf / output_docx / mapping_file / text_backup)
         outputs = {}
         for k, v in info.items():
             if k in ('output_pdf', 'output_docx', 'output_md', 'output_txt', 'mapping_file', 'text_backup'):
@@ -974,7 +974,7 @@ def _process_batch_item(batch_id: str, item: dict, options: dict):
         item['status'] = 'error'
         item['error'] = str(e)
     finally:
-        # 记录完成时间和实际耗时
+        # Record the finish time and the actual elapsed time
         if 'started_at' in item:
             item['finished_at'] = time.time()
             item['elapsed_s'] = round(item['finished_at'] - item['started_at'], 1)
@@ -985,15 +985,15 @@ def _process_batch_item(batch_id: str, item: dict, options: dict):
 
 @app.route('/api/restore/extract', methods=['POST'])
 def restore_extract_text():
-    """从上传的脱敏后文件（pdf/docx/txt）提取纯文本，给还原页用"""
+    """Extract plain text from an uploaded anonymized file (pdf/docx/txt) for the restore page."""
     if 'file' not in request.files:
-        return jsonify({'error': '未选择文件'}), 400
+        return jsonify({'error': 'No file selected'}), 400
     f = request.files['file']
     if not f.filename:
-        return jsonify({'error': '文件名为空'}), 400
+        return jsonify({'error': 'File name is empty'}), 400
     suffix = Path(f.filename).suffix.lower()
     if suffix not in {'.txt', '.md', '.pdf', '.docx', '.doc'}:
-        return jsonify({'error': f'不支持的格式: {suffix}'}), 400
+        return jsonify({'error': f'Unsupported format: {suffix}'}), 400
     safe_name = f"restore_{uuid.uuid4().hex[:8]}_{f.filename}"
     save_path = UPLOAD_DIR / safe_name
     f.save(str(save_path))
@@ -1003,7 +1003,7 @@ def restore_extract_text():
         text = a.processor.extract_text(str(save_path), use_ocr=False)
         return jsonify({'text': text, 'chars': len(text)})
     except Exception as e:
-        return jsonify({'error': f'提取失败: {str(e)}'}), 500
+        return jsonify({'error': f'Extraction failed: {str(e)}'}), 500
     finally:
         try:
             save_path.unlink()
@@ -1013,18 +1013,18 @@ def restore_extract_text():
 
 @app.route('/api/restore', methods=['POST'])
 def restore_text():
-    """根据脱敏映射 JSON 把脱敏文本还原成原文"""
+    """Restore anonymized text back to the original using the anonymization mapping JSON."""
     data = request.get_json() or {}
     anonymized_text = data.get('text', '')
     mapping_data = data.get('mapping')
 
     if not anonymized_text:
-        return jsonify({'error': '请粘贴脱敏后的文本'}), 400
+        return jsonify({'error': 'Please paste the anonymized text'}), 400
     if not mapping_data:
-        return jsonify({'error': '请提供映射字典（mapping.json 的内容或上传文件）'}), 400
+        return jsonify({'error': 'Please provide the mapping dictionary (the contents of mapping.json or an uploaded file)'}), 400
 
-    # mapping 可能是直接的 {占位符: {original, type}}，
-    # 也可能是工具导出的完整 JSON：{metadata, mapping, replacement_log}
+    # mapping may be a direct {placeholder: {original, type}},
+    # or the full JSON exported by the tool: {metadata, mapping, replacement_log}
     if isinstance(mapping_data, dict) and 'mapping' in mapping_data and isinstance(mapping_data['mapping'], dict):
         mapping_dict = mapping_data['mapping']
     else:
@@ -1037,16 +1037,16 @@ def restore_text():
             'replacements': len(mapping_dict) if isinstance(mapping_dict, dict) else 0,
         })
     except Exception as e:
-        return jsonify({'error': f'还原失败: {str(e)}'}), 500
+        return jsonify({'error': f'Restore failed: {str(e)}'}), 500
 
 
 @app.route('/api/batch/upload', methods=['POST'])
 def batch_upload():
-    """批量上传文件，返回 batch_id 与每个文件的元信息"""
+    """Batch-upload files; returns the batch_id and metadata for each file."""
     _cleanup_batches()
     files = request.files.getlist('files')
     if not files:
-        return jsonify({'error': '未选择文件'}), 400
+        return jsonify({'error': 'No file selected'}), 400
 
     batch_id = uuid.uuid4().hex[:10]
     items = []
@@ -1057,7 +1057,7 @@ def batch_upload():
         if suffix not in SUPPORTED_EXTENSIONS:
             items.append({
                 'idx': idx, 'name': f.filename, 'size': 0,
-                'status': 'rejected', 'error': f'不支持的格式 {suffix}',
+                'status': 'rejected', 'error': f'Unsupported format {suffix}',
                 'file_path': None, 'outputs': {},
             })
             continue
@@ -1099,7 +1099,7 @@ def batch_upload():
 
 @app.route('/api/batch/start', methods=['POST'])
 def batch_start():
-    """开始批量脱敏（异步，逐个跑）"""
+    """Start batch anonymization (async, processed one at a time)."""
     data = request.get_json() or {}
     batch_id = data.get('batch_id')
     options = {
@@ -1112,9 +1112,9 @@ def batch_start():
     }
     batch = batches.get(batch_id)
     if not batch:
-        return jsonify({'error': '批次不存在或已过期'}), 404
+        return jsonify({'error': 'Batch does not exist or has expired'}), 404
     if batch['started']:
-        return jsonify({'error': '批次已开始'}), 400
+        return jsonify({'error': 'Batch already started'}), 400
 
     batch['started'] = True
 
@@ -1131,7 +1131,7 @@ def batch_start():
 def batch_status(batch_id):
     batch = batches.get(batch_id)
     if not batch:
-        return jsonify({'error': '批次不存在或已过期'}), 404
+        return jsonify({'error': 'Batch does not exist or has expired'}), 404
     return jsonify({
         'batch_id': batch_id,
         'total': batch['total'],
@@ -1160,35 +1160,35 @@ def batch_status(batch_id):
 
 @app.route('/api/batch/download/<batch_id>', methods=['GET'])
 def batch_download(batch_id):
-    """打包下载整个批次的所有输出文件为 zip"""
+    """Package all output files of an entire batch into a zip for download."""
     import zipfile, io
     from urllib.parse import quote
     batch = batches.get(batch_id)
     if not batch:
-        return jsonify({'error': '批次不存在或已过期'}), 404
+        return jsonify({'error': 'Batch does not exist or has expired'}), 404
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for it in batch['items']:
             if it['status'] != 'done':
                 continue
-            # 在 zip 内的目录结构：原文件名（去后缀）/ {输出文件名}
+            # Directory structure inside the zip: original file name (without extension) / {output file name}
             stem = Path(it['name']).stem
-            # 输出文件实际名带 batch_ 前缀，重命名为简洁的：原名{.pdf|_mapping.json|.txt}
+            # The actual output file name carries a batch_ prefix; rename it to a clean: original_name{.pdf|_mapping.json|.txt}
             for kind, path in (it.get('outputs') or {}).items():
                 if not path or not Path(path).exists():
                     continue
                 p = Path(path)
-                # 把 batch_<id>_NN_ 前缀剥掉，让 zip 里文件名干净
+                # Strip the batch_<id>_NN_ prefix so the file names in the zip are clean
                 clean_name = re.sub(r'^batch_[a-f0-9]+_\d+_', '', p.name)
                 arc_name = f"{stem}/{clean_name}"
                 zf.write(str(p), arc_name)
     buf.seek(0)
 
-    # Content-Disposition：filename 用 ASCII，filename* 用 UTF-8 编码（RFC 5987），
-    # 否则 Werkzeug 会因非 Latin-1 字符报 UnicodeError 让请求挂死。
+    # Content-Disposition: use ASCII for filename and UTF-8 encoding for filename* (RFC 5987),
+    # otherwise Werkzeug raises a UnicodeError on non-Latin-1 characters and the request hangs.
     ascii_name = f'batch_{batch_id}_results.zip'
-    utf8_name = quote(f'批量脱敏结果_{batch_id}.zip', safe='')
+    utf8_name = quote(f'batch_anonymized_results_{batch_id}.zip', safe='')
     from flask import Response
     return Response(
         buf.getvalue(),
@@ -1203,7 +1203,7 @@ def batch_download(batch_id):
 
 
 def find_free_port(start=8080, end=8099):
-    """找到一个可用端口"""
+    """Find an available port."""
     import socket
     for port in range(start, end):
         try:
@@ -1216,7 +1216,7 @@ def find_free_port(start=8080, end=8099):
 
 
 def cleanup_old_files():
-    """启动时清理超过24小时的临时上传文件，超过48小时的输出文件"""
+    """At startup, clean up temporary upload files older than 24 hours and output files older than 48 hours."""
     now = time.time()
     for directory, max_age in [(UPLOAD_DIR, 86400), (OUTPUT_DIR, 172800)]:
         for f in directory.iterdir():
@@ -1231,7 +1231,7 @@ import atexit
 
 @atexit.register
 def on_exit():
-    """服务停止时清理所有上传临时文件（输出文件保留供用户取回）"""
+    """When the service stops, clean up all temporary upload files (output files are kept for the user to retrieve)."""
     for f in UPLOAD_DIR.iterdir():
         if f.is_file():
             try:
@@ -1249,21 +1249,23 @@ if __name__ == '__main__':
 
     print()
     print("=" * 50)
-    print("  法律文档脱敏工具 - Web 界面")
-    print("  by 黄灵宝同学")
+    print("  Legal Anonymizer - browser interface")
+    print("  by Lingbao Huang")
     print("=" * 50)
     print()
-    print(f"  Inbox 文件夹: {INBOX_DIR}")
-    print(f"  输出文件夹:   {OUTPUT_DIR}")
+    print(f"  Inbox folder:  {INBOX_DIR}")
+    print(f"  Output folder: {OUTPUT_DIR}")
     print()
-    print(f"  请在浏览器中打开: http://127.0.0.1:{port}")
+    print(f"  Open in your browser: http://127.0.0.1:{port}")
     print()
-    print("  数据完全本地处理，不上传云端")
-    print("  按 Ctrl+C 停止服务")
+    print("  All data is processed locally and never uploaded to the cloud")
+    print("  Press Ctrl+C to stop the service")
     print("=" * 50)
     print()
 
-    # 延迟 1.5 秒后自动打开浏览器
+    # Open the browser automatically after a short delay
     threading.Timer(3.0, lambda: webbrowser.open(f'http://127.0.0.1:{port}')).start()
 
+    app.jinja_env.auto_reload = True
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.run(host='127.0.0.1', port=port, debug=False)

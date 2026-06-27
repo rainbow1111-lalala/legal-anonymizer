@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>法律文档脱敏工具 - 黄灵宝同学出品</title>
+<title>Legal Anonymizer - by Lingbao Huang</title>
 <style>
 :root {
   --primary: #165DFF;
@@ -257,7 +257,7 @@ body {
 }
 .toggle-switch.on::after { transform: translateX(20px); }
 
-/* LLM Toggles（CN NER / OpenAI）*/
+/* LLM Toggles (CN NER / OpenAI) */
 .llm-toggle {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 14px;
@@ -558,84 +558,84 @@ body {
   <div class="header-left">
     <div class="header-icon">&#128274;</div>
     <div>
-      <h1>法律文档脱敏工具</h1>
-      <div style="font-size:11px;opacity:0.7;margin-top:2px;">by 黄灵宝同学</div>
+      <h1>Legal Anonymizer</h1>
+      <div style="font-size:11px;opacity:0.7;margin-top:2px;">by Lingbao Huang</div>
     </div>
   </div>
-  <div class="header-badge">&#128737; 数据完全本地处理</div>
+  <div class="header-badge">&#128737; All processing stays on your machine</div>
 </div>
 
 <div class="main">
-  <!-- Mode switch: 单文件 / 批量 / 还原 -->
+  <!-- Mode switch: single / batch / restore -->
   <div style="display:flex;justify-content:center;gap:0;margin-bottom:18px;background:#f0f2f5;padding:4px;border-radius:10px;width:fit-content;margin-left:auto;margin-right:auto;">
     <button id="mode-single-btn" class="btn"
             style="padding:8px 22px;border:none;background:#fff;color:#1a1a1a;border-radius:7px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,0.08);font-size:14px;"
-            onclick="switchMode('single')">单文件处理</button>
+            onclick="switchMode('single')">Single file</button>
     <button id="mode-batch-btn" class="btn"
             style="padding:8px 22px;border:none;background:transparent;color:#666;border-radius:7px;font-weight:500;font-size:14px;"
-            onclick="switchMode('batch')">批量处理</button>
+            onclick="switchMode('batch')">Batch</button>
     <button id="mode-restore-btn" class="btn"
             style="padding:8px 22px;border:none;background:transparent;color:#666;border-radius:7px;font-weight:500;font-size:14px;"
-            onclick="switchMode('restore')">脱敏还原</button>
+            onclick="switchMode('restore')">Restore</button>
   </div>
 
-  <!-- Stepper（仅单文件模式） -->
+  <!-- Stepper (single-file mode only) -->
   <div class="stepper" id="stepper-row">
     <div class="step-item active" id="step-ind-1">
       <div class="step-num">1</div>
-      <div class="step-label">上传文档</div>
+      <div class="step-label">Upload document</div>
     </div>
     <div class="step-divider" id="step-div-1"></div>
     <div class="step-item" id="step-ind-2">
       <div class="step-num">2</div>
-      <div class="step-label">审核实体</div>
+      <div class="step-label">Review entities</div>
     </div>
     <div class="step-divider" id="step-div-2"></div>
     <div class="step-item" id="step-ind-3">
       <div class="step-num">3</div>
-      <div class="step-label">完成输出</div>
+      <div class="step-label">Done</div>
     </div>
   </div>
 
-  <!-- ============== 批量处理面板 ============== -->
+  <!-- ============== Batch panel ============== -->
   <div id="batch-panel" class="hidden">
     <div class="card">
-      <div class="card-title">批量上传</div>
+      <div class="card-title">Batch upload</div>
       <div class="upload-zone" id="batch-drop-zone" onclick="document.getElementById('batch-file-input').click()">
         <div class="upload-icon">&#128194;</div>
-        <div class="upload-text">拖拽多个文件到这里，或点击选择（可多选）</div>
-        <div class="upload-hint">支持同时处理多份 PDF/Word/图片/文本，单个最大 50MB</div>
+        <div class="upload-text">Drag multiple files here, or click to select (multi-select)</div>
+        <div class="upload-hint">Process several PDF/Word/image/text files at once, up to 50MB each</div>
       </div>
       <input type="file" id="batch-file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp" style="display:none">
     </div>
 
     <div id="batch-options" class="card hidden">
-      <div class="card-title">脱敏选项</div>
+      <div class="card-title">Redaction options</div>
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
         <label style="display:flex;gap:6px;align-items:center;font-size:13px;">
-          <span>掩码策略：</span>
+          <span>Mask strategy:</span>
           <select id="batch-mask-strategy" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;">
-            <option value="placeholder">占位符（[PERSON_1]）</option>
-            <option value="partial">部分掩码（138****5678）</option>
-            <option value="whitebox">白框遮掩（PDF：纯白框无文字）</option>
+            <option value="placeholder">Placeholder ([PERSON_1])</option>
+            <option value="partial">Partial mask (138****5678)</option>
+            <option value="whitebox">White box (PDF: blank box, no text)</option>
           </select>
         </label>
         <label style="display:flex;gap:6px;align-items:center;font-size:13px;">
-          <span>占位符样式：</span>
+          <span>Placeholder style:</span>
           <select id="batch-placeholder-style" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;">
-            <option value="english_bracket">[PERSON_1]（英文）</option>
-            <option value="chinese_angle">&lt;人物1&gt;（中文）</option>
-            <option value="chinese_bracket">〔姓名1〕（中文方头）</option>
+            <option value="english_bracket">[PERSON_1] (English)</option>
+            <option value="chinese_angle">&lt;人物1&gt; (Chinese)</option>
+            <option value="chinese_bracket">〔姓名1〕 (Chinese bracket)</option>
           </select>
         </label>
         <label style="display:flex;gap:6px;align-items:center;font-size:13px;">
-          <span>输出格式：</span>
+          <span>Output format:</span>
           <select id="batch-output-format" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;">
-            <option value="auto">自动（保持原格式）</option>
+            <option value="auto">Auto (keep original format)</option>
             <option value="pdf">PDF</option>
             <option value="docx">Word</option>
             <option value="md">Markdown</option>
-            <option value="txt">纯文本</option>
+            <option value="txt">Plain text</option>
           </select>
         </label>
       </div>
@@ -643,79 +643,79 @@ body {
 
     <div id="batch-file-list" class="card hidden">
       <div class="card-title">
-        待处理文件 <span id="batch-count" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
+        Files to process <span id="batch-count" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
       </div>
       <div id="batch-items"></div>
       <div style="display:flex;gap:10px;margin-top:14px;">
-        <button class="btn btn-primary" id="batch-start-btn" onclick="startBatch()">开始批量脱敏</button>
-        <button class="btn btn-outline" onclick="resetBatch()">清空</button>
+        <button class="btn btn-primary" id="batch-start-btn" onclick="startBatch()">Start batch redaction</button>
+        <button class="btn btn-outline" onclick="resetBatch()">Clear</button>
       </div>
     </div>
 
     <div id="batch-progress" class="card hidden">
       <div class="card-title">
-        处理进度 <span id="batch-progress-label" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
+        Progress <span id="batch-progress-label" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
       </div>
       <div style="background:#f0f2f5;height:8px;border-radius:4px;overflow:hidden;margin-bottom:14px;">
         <div id="batch-progress-bar" style="background:linear-gradient(90deg,#3b82f6,#10b981);height:100%;width:0%;transition:width 0.3s;"></div>
       </div>
       <div id="batch-progress-list"></div>
       <div id="batch-actions" class="hidden" style="display:flex;gap:10px;margin-top:14px;">
-        <button class="btn btn-primary" onclick="downloadBatch()">&#128229; 下载全部（zip）</button>
-        <button class="btn btn-outline" onclick="resetBatch()">处理新批次</button>
+        <button class="btn btn-primary" onclick="downloadBatch()">&#128229; Download all (zip)</button>
+        <button class="btn btn-outline" onclick="resetBatch()">New batch</button>
       </div>
     </div>
   </div>
 
-  <!-- ============== 还原面板 ============== -->
+  <!-- ============== Restore panel ============== -->
   <div id="restore-panel" class="hidden">
     <div class="card">
-      <div class="card-title">脱敏还原</div>
+      <div class="card-title">Restore</div>
       <div style="font-size:13px;color:var(--text-2);margin-bottom:14px;">
-        把脱敏后的文本和映射字典（之前导出的 <code>_mapping.json</code>）粘进来或上传，把占位符还原成原始内容。
+        Paste or upload the redacted text and the mapping file (the <code>_mapping.json</code> you exported earlier) to turn the placeholders back into the original content.
       </div>
 
       <div style="margin-bottom:14px;">
-        <label style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">1. 脱敏后文本</label>
+        <label style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">1. Redacted text</label>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">
-          可以从脱敏后下载的 .txt 文件直接上传，或把内容复制粘贴到下面输入框。
+          Upload the .txt file you downloaded after redaction, or copy and paste the content into the box below.
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
           <label for="restore-text-file"
                  style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;
                         background:#f0f7ff;border:1px dashed #91caff;border-radius:8px;
                         cursor:pointer;font-size:13px;color:#003a8c;">
-            📁 <span id="restore-text-file-label">点击选择脱敏后文件（.docx / .pdf / .txt）</span>
+            📁 <span id="restore-text-file-label">Click to select redacted file (.docx / .pdf / .txt)</span>
           </label>
           <button id="restore-text-clear" type="button" onclick="clearRestoreText()" class="hidden"
                   style="padding:8px 12px;background:#fff;border:1px solid #ffccc7;color:#cf1322;
                          border-radius:6px;cursor:pointer;font-size:12px;">
-            ✕ 撤销重选
+            ✕ Undo / reselect
           </button>
         </div>
         <input type="file" id="restore-text-file" accept=".txt,.md,.pdf,.docx,.doc"
                onchange="loadRestoreText(this)" style="display:none;">
         <textarea id="restore-text-input"
-                  placeholder="或把脱敏后的文本粘进来..."
+                  placeholder="Or paste the redacted text here..."
                   style="width:100%;min-height:140px;padding:10px;border:1px solid #ddd;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical;"></textarea>
       </div>
 
       <div style="margin-bottom:14px;">
-        <label style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">2. 上传脱敏映射文件</label>
+        <label style="display:block;font-weight:600;margin-bottom:6px;font-size:13px;">2. Upload mapping file</label>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">
-          脱敏时一起下载的 <code>_mapping.json</code> 文件，直接选上来即可。
+          Just select the <code>_mapping.json</code> file you downloaded alongside the redacted document.
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <label for="restore-map-file"
                  style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;
                         background:#f0f7ff;border:1px dashed #91caff;border-radius:8px;
                         cursor:pointer;font-size:13px;color:#003a8c;">
-            📁 <span id="restore-map-file-label">点击选择 _mapping.json 文件</span>
+            📁 <span id="restore-map-file-label">Click to select the _mapping.json file</span>
           </label>
           <button id="restore-map-clear" type="button" onclick="clearRestoreMap()" class="hidden"
                   style="padding:8px 12px;background:#fff;border:1px solid #ffccc7;color:#cf1322;
                          border-radius:6px;cursor:pointer;font-size:12px;">
-            ✕ 撤销重选
+            ✕ Undo / reselect
           </button>
         </div>
         <input type="file" id="restore-map-file" accept=".json"
@@ -723,16 +723,16 @@ body {
         <div style="margin-top:10px;font-size:12px;">
           <a href="javascript:void(0)" onclick="toggleRestoreMapPaste()"
              id="restore-map-paste-toggle"
-             style="color:var(--text-3);text-decoration:underline;">高级：直接粘贴 JSON 内容 ▾</a>
+             style="color:var(--text-3);text-decoration:underline;">Advanced: paste JSON content directly ▾</a>
         </div>
         <textarea id="restore-map-input" class="hidden"
-                  placeholder='{"mapping":{"[PERSON_1]":{"original":"张三","type":"person"},...}}'
+                  placeholder='{"mapping":{"[PERSON_1]":{"original":"Zhang San","type":"person"},...}}'
                   style="width:100%;min-height:100px;padding:10px;border:1px solid #ddd;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;resize:vertical;margin-top:8px;"></textarea>
       </div>
 
       <div style="display:flex;gap:10px;">
-        <button class="btn btn-primary" onclick="doRestore()">还原原文</button>
-        <button class="btn btn-outline" onclick="resetRestore()">清空</button>
+        <button class="btn btn-primary" onclick="doRestore()">Restore original text</button>
+        <button class="btn btn-outline" onclick="resetRestore()">Clear</button>
       </div>
 
       <div id="restore-error" class="hidden" style="margin-top:12px;"></div>
@@ -740,28 +740,28 @@ body {
 
     <div id="restore-result-card" class="card hidden">
       <div class="card-title">
-        还原结果 <span id="restore-stats" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
+        Restore result <span id="restore-stats" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
       </div>
       <textarea id="restore-output" readonly
                 style="width:100%;min-height:200px;padding:10px;border:1px solid #ddd;border-radius:6px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:#fafafa;resize:vertical;"></textarea>
       <div style="display:flex;gap:10px;margin-top:10px;">
-        <button class="btn btn-outline" onclick="copyRestoreOutput()">📋 复制</button>
-        <button class="btn btn-outline" onclick="downloadRestoreOutput()">📥 下载 .txt</button>
+        <button class="btn btn-outline" onclick="copyRestoreOutput()">📋 Copy</button>
+        <button class="btn btn-outline" onclick="downloadRestoreOutput()">📥 Download .txt</button>
       </div>
     </div>
   </div>
 
-  <!-- ============== 单文件模式（原 Step1/2/3） ============== -->
+  <!-- ============== Single-file mode (Step 1/2/3) ============== -->
 
   <div id="single-mode-panel">
   <!-- Step 1: Upload -->
   <div id="step-1">
     <div class="card">
-      <div class="card-title">上传文档</div>
+      <div class="card-title">Upload document</div>
       <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
         <div class="upload-icon">&#128196;</div>
-        <div class="upload-text">拖拽文件到这里，或点击选择文件</div>
-        <div class="upload-hint">支持 PDF、Word、图片、文本文件，最大 50MB</div>
+        <div class="upload-text">Drag a file here, or click to select</div>
+        <div class="upload-hint">Supports PDF, Word, images and text files, up to 50MB</div>
         <div class="upload-formats">
           <span class="format-badge">PDF</span>
           <span class="format-badge">DOCX</span>
@@ -775,16 +775,16 @@ body {
 
     <div class="card inbox-section">
       <div class="card-title" style="cursor:pointer;user-select:none;" onclick="toggleInbox()">
-        <span class="arrow" id="inbox-arrow" style="transition:transform 0.2s;display:inline-block;transform:rotate(90deg);">&#9654;</span> 或从文件夹选择
+        <span class="arrow" id="inbox-arrow" style="transition:transform 0.2s;display:inline-block;transform:rotate(90deg);">&#9654;</span> Or pick from a folder
       </div>
       <div id="inbox-content">
         <div class="inbox-header">
-          <span style="font-size:13px;color:var(--text-2)">将文件放入工具目录下的文件夹：</span>
+          <span style="font-size:13px;color:var(--text-2)">Drop files into this folder inside the tool's directory:</span>
           <span class="inbox-path" id="inbox-path">inbox/</span>
         </div>
         <div id="inbox-list"></div>
         <div class="text-center mt-8">
-          <button class="btn btn-outline" onclick="refreshInbox()" style="font-size:12px;">&#8635; 刷新列表</button>
+          <button class="btn btn-outline" onclick="refreshInbox()" style="font-size:12px;">&#8635; Refresh list</button>
         </div>
       </div>
     </div>
@@ -792,55 +792,55 @@ body {
     <!-- File selected state -->
     <div id="file-selected" class="hidden">
       <div class="card">
-        <div class="card-title">已选文件</div>
+        <div class="card-title">Selected file</div>
         <div class="file-card">
           <div class="file-card-icon" id="file-icon">&#128196;</div>
           <div class="file-card-info">
             <div class="file-card-name" id="file-name"></div>
             <div class="file-card-size" id="file-size"></div>
           </div>
-          <button class="file-card-remove" onclick="resetUpload()" title="移除">&#10005;</button>
+          <button class="file-card-remove" onclick="resetUpload()" title="Remove">&#10005;</button>
         </div>
 
         <div id="ocr-option" class="hidden">
           <div class="ocr-toggle">
             <span style="font-size:18px">&#128196;</span>
             <label id="ocr-label">
-              <strong>PDF 文件</strong> - 启用 OCR 识别（扫描版必须开启）
+              <strong>PDF file</strong> - enable OCR (required for scanned PDFs)
             </label>
             <div class="toggle-switch" id="ocr-switch" onclick="toggleOCR()"></div>
           </div>
         </div>
         <div id="ocr-textlayer-notice" class="hidden" style="background:#e7f3ff;border:1px solid #91caff;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:13px;color:#003a8c;">
-          ℹ️ <strong>检测到文字版 PDF</strong>，无需启用 OCR。直接关闭 OCR 处理速度更快、保留原版式更精确。
+          ℹ️ <strong>Text-based PDF detected</strong>. OCR is not needed. Leaving OCR off is faster and preserves the original layout more accurately.
         </div>
         <div id="ocr-scanned-notice" class="hidden" style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:13px;color:#856404;">
-          &#9888;&#65039; <strong>检测到扫描版 PDF</strong>，已自动启用 OCR 识别。处理时间可能稍长，请耐心等待。
+          &#9888;&#65039; <strong>Scanned PDF detected</strong>. OCR has been enabled automatically. Processing may take a little longer, please wait.
         </div>
 
-        <!-- OCR 引擎选择（仅 OCR 开启时可见）-->
+        <!-- OCR engine selection (visible only when OCR is on) -->
         <div id="ocr-engine-option" class="hidden" style="margin-top:8px; padding:10px 14px; background:#f8f9fb; border:1px solid #e4e7ed; border-radius:8px;">
-          <div style="font-size:13px;color:var(--text-2);margin-bottom:6px;">OCR 引擎</div>
+          <div style="font-size:13px;color:var(--text-2);margin-bottom:6px;">OCR engine</div>
           <div class="radio-group">
             <label class="radio-item">
-              <input type="radio" name="ocr-engine" value="rapidocr" checked> ⚡ RapidOCR <span style="color:var(--text-3);font-size:12px">（快，默认）</span>
+              <input type="radio" name="ocr-engine" value="rapidocr" checked> ⚡ RapidOCR <span style="color:var(--text-3);font-size:12px">(fast, default)</span>
             </label>
             <label class="radio-item">
-              <input type="radio" name="ocr-engine" value="paddleocr"> 🎯 PaddleOCR <span style="color:var(--text-3);font-size:12px">（复杂排版更准，慢）</span>
+              <input type="radio" name="ocr-engine" value="paddleocr"> 🎯 PaddleOCR <span style="color:var(--text-3);font-size:12px">(more accurate on complex layouts, slower)</span>
             </label>
           </div>
         </div>
 
-        <!-- LLM 补充检测层（可选）-->
+        <!-- Optional supplementary detection layer (LLM) -->
         <div style="margin-top:12px;">
           <div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">
-            &#128302; 补充检测层（可选）&mdash; 首次启用会下载模型，之后离线推理
+            &#128302; Supplementary detection layer (optional) &mdash; the model downloads on first use, then runs offline
           </div>
           <div class="llm-toggle">
             <span style="font-size:18px">&#127464;&#127475;</span>
             <label>
-              <strong>中文 NER</strong>（CLUENER，~400MB）
-              <div class="llm-hint">补规则漏掉的中文人名/公司/地址，含复姓识别</div>
+              <strong>Chinese NER</strong> (CLUENER, ~400MB)
+              <div class="llm-hint">Catches Chinese names/companies/addresses the rules miss, including compound surnames</div>
             </label>
             <div class="toggle-switch on" id="cn-llm-switch" onclick="toggleCnLlm()"></div>
           </div>
@@ -848,8 +848,8 @@ body {
           <div class="llm-toggle">
             <span style="font-size:18px">&#127482;&#127480;</span>
             <label>
-              <strong>OpenAI privacy-filter</strong>（1.5B，~2.6GB）
-              <div class="llm-hint">补英文人名/英文地址/国际电话/API token（首次下载较慢）</div>
+              <strong>OpenAI privacy-filter</strong> (1.5B, ~2.6GB)
+              <div class="llm-hint">Catches English names/addresses, international phone numbers and API tokens (slower on first download)</div>
             </label>
             <div class="toggle-switch" id="llm-switch" onclick="toggleLlm()"></div>
           </div>
@@ -860,16 +860,16 @@ body {
 
         <div class="btn-group">
           <button class="btn btn-primary" onclick="analyzeDocument()" id="analyze-btn">
-            &#128269; 开始分析
+            &#128269; Start analysis
           </button>
         </div>
 
         <div id="analyzing" class="hidden">
           <div class="loading">
             <div class="spinner"></div>
-            <span id="analyzing-msg">正在分析文档，请稍候...</span>
+            <span id="analyzing-msg">Analyzing document, please wait...</span>
           </div>
-          <!-- 进度条 + 时间预估 -->
+          <!-- Progress bar + time estimate -->
           <div id="analyze-progress-wrap" style="margin-top:12px;">
             <div style="background:#f0f2f5;height:8px;border-radius:4px;overflow:hidden;">
               <div id="analyze-progress-bar" style="background:linear-gradient(90deg,#3b82f6,#10b981);height:100%;width:0%;transition:width 0.4s;"></div>
@@ -887,40 +887,40 @@ body {
   <!-- Step 2: Review -->
   <div id="step-2" class="hidden">
     <div class="card">
-      <div class="card-title">检测到的敏感信息</div>
+      <div class="card-title">Detected sensitive information</div>
       <div id="findings-summary" class="findings-summary"></div>
       <div id="findings-list"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">手动添加实体</div>
+      <div class="card-title">Add an entity manually</div>
       <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;">
-        如果有自动检测未覆盖的人名、公司名等，可以在此手动添加：
+        If automatic detection missed a name, company, etc., add it here manually:
       </p>
       <div class="add-entity-form">
         <select id="add-type">
-          <option value="person">人名</option>
-          <option value="company">公司名</option>
-          <option value="law_firm">律师事务所</option>
-          <option value="court">法院</option>
-          <option value="address">地址</option>
-          <option value="phone">号码</option>
-          <option value="bank_name">银行</option>
-          <option value="government">政府机关</option>
-          <option value="institution">机构</option>
-          <option value="other">其他</option>
+          <option value="person">Person name</option>
+          <option value="company">Company</option>
+          <option value="law_firm">Law firm</option>
+          <option value="court">Court</option>
+          <option value="address">Address</option>
+          <option value="phone">Mobile number</option>
+          <option value="bank_name">Bank</option>
+          <option value="government">Government</option>
+          <option value="institution">Institution</option>
+          <option value="other">Other</option>
         </select>
-        <input type="text" id="add-name" placeholder="输入实体名称，如：张三" onkeydown="if(event.key==='Enter')addEntity()">
-        <button class="btn btn-primary" onclick="addEntity()" style="padding:8px 14px;">添加</button>
+        <input type="text" id="add-name" placeholder="Enter an entity, e.g. Zhang San" onkeydown="if(event.key==='Enter')addEntity()">
+        <button class="btn btn-primary" onclick="addEntity()" style="padding:8px 14px;">Add</button>
       </div>
       <div class="custom-entity-list" id="custom-entities"></div>
     </div>
 
     <div class="card">
-      <div class="card-title">输出设置</div>
+      <div class="card-title">Output settings</div>
       <div class="options-row">
         <div class="option-group">
-          <label>输出格式（可多选）</label>
+          <label>Output format (select one or more)</label>
           <div class="radio-group">
             <label class="radio-item">
               <input type="checkbox" name="format" value="md"> MD
@@ -933,29 +933,29 @@ body {
             </label>
           </div>
           <div style="margin-top:6px;font-size:12px;color:var(--text-3);">
-            同源格式（DOCX→DOCX、PDF→PDF）会最大限度保留原样式；其余用仿宋/小四/1.5 倍行距模板。
+            Same-format output (DOCX&rarr;DOCX, PDF&rarr;PDF) preserves the original styling as closely as possible; other formats use a FangSong / 12pt / 1.5 line-spacing template.
           </div>
         </div>
         <div class="option-group">
-          <label>掩码策略</label>
+          <label>Mask strategy</label>
           <div class="radio-group">
             <label class="radio-item">
-              <input type="radio" name="strategy" value="placeholder" checked> 占位符 [PERSON_1]
+              <input type="radio" name="strategy" value="placeholder" checked> Placeholder [PERSON_1]
             </label>
             <label class="radio-item">
-              <input type="radio" name="strategy" value="partial"> 部分掩码 张**
+              <input type="radio" name="strategy" value="partial"> Partial mask Zhang**
             </label>
             <label class="radio-item">
-              <input type="radio" name="strategy" value="whitebox"> 白框遮掩（PDF 专用）
+              <input type="radio" name="strategy" value="whitebox"> White box (PDF only)
             </label>
           </div>
         </div>
         <div style="margin-top:10px;">
-          <label style="font-size:13px;">占位符样式</label>
+          <label style="font-size:13px;">Placeholder style</label>
           <select id="placeholder-style" style="margin-left:8px;padding:5px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
-            <option value="english_bracket">[PERSON_1] 英文方括号（默认）</option>
-            <option value="chinese_angle">&lt;人物1&gt; 中文尖括号</option>
-            <option value="chinese_bracket">〔姓名1〕 中文方头括号</option>
+            <option value="english_bracket">[PERSON_1] English square brackets (default)</option>
+            <option value="chinese_angle">&lt;人物1&gt; Chinese angle brackets</option>
+            <option value="chinese_bracket">〔姓名1〕 Chinese lenticular brackets</option>
           </select>
         </div>
       </div>
@@ -963,16 +963,16 @@ body {
       <div id="anonymize-error" class="hidden"></div>
 
       <div class="btn-group">
-        <button class="btn btn-outline" onclick="goToStep(1)">&#9664; 返回</button>
+        <button class="btn btn-outline" onclick="goToStep(1)">&#9664; Back</button>
         <button class="btn btn-primary" onclick="anonymizeDocument()" id="anonymize-btn">
-          &#128274; 执行脱敏
+          &#128274; Run redaction
         </button>
       </div>
 
       <div id="anonymizing" class="hidden">
         <div class="loading">
           <div class="spinner"></div>
-          <span>正在脱敏处理...</span>
+          <span>Redacting...</span>
         </div>
       </div>
     </div>
@@ -982,107 +982,107 @@ body {
   <div id="step-3" class="hidden">
     <div class="card result-card">
       <div class="result-icon">&#9989;</div>
-      <div class="result-title">脱敏完成</div>
-      <div class="result-subtitle">文档已成功处理，所有敏感信息已替换</div>
+      <div class="result-title">Redaction complete</div>
+      <div class="result-subtitle">The document was processed successfully and all sensitive information was replaced</div>
 
       <div class="result-stats">
         <div class="stat-item">
           <div class="stat-value" id="stat-entities">0</div>
-          <div class="stat-label">唯一实体</div>
+          <div class="stat-label">Unique entities</div>
         </div>
         <div class="stat-item">
           <div class="stat-value" id="stat-replacements">0</div>
-          <div class="stat-label">替换次数</div>
+          <div class="stat-label">Replacements</div>
         </div>
       </div>
 
       <div class="result-path">
-        <div class="result-path-label">&#128193; 输出文件：</div>
+        <div class="result-path-label">&#128193; Output files:</div>
         <div id="output-paths-list" style="font-size:12px;color:var(--text-3);"></div>
       </div>
 
       <div class="btn-group" id="download-btns" style="flex-wrap:wrap;">
-        <!-- 多格式下载按钮将由 renderResults 动态渲染 -->
-        <a class="btn btn-outline" id="download-mapping-btn" href="#">&#128203; 下载映射表</a>
-        <button class="btn btn-outline" onclick="toggleReAnonymize()" style="color:var(--warning);border-color:var(--warning);">&#9888; 仍有未脱敏内容</button>
+        <!-- Per-format download buttons are rendered dynamically by renderResults -->
+        <a class="btn btn-outline" id="download-mapping-btn" href="#">&#128203; Download mapping table</a>
+        <button class="btn btn-outline" onclick="toggleReAnonymize()" style="color:var(--warning);border-color:var(--warning);">&#9888; Still some unredacted content</button>
       </div>
 
-      <!-- 继续脱敏面板 -->
+      <!-- Additional redaction panel -->
       <div id="re-anonymize-panel" class="hidden" style="margin-top:20px;">
         <div style="background:var(--warning-light);border:1px solid rgba(255,125,0,0.2);border-radius:var(--radius-sm);padding:16px;">
-          <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--warning);">&#128270; 补充脱敏</div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--warning);">&#128270; Additional redaction</div>
           <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;">
-            请输入文件中仍需脱敏的内容（支持批量添加，每行一个）：
+            Enter any content in the file that still needs to be redacted (batch input supported, one per line):
           </p>
           <div class="add-entity-form">
             <select id="re-add-type">
-              <option value="person">人名</option>
-              <option value="company">公司名</option>
-              <option value="law_firm">律师事务所</option>
-              <option value="court">法院</option>
-              <option value="address">地址</option>
-              <option value="phone">号码</option>
-              <option value="bank_name">银行</option>
-              <option value="government">政府机关</option>
-              <option value="institution">机构</option>
-              <option value="other">其他</option>
+              <option value="person">Person name</option>
+              <option value="company">Company</option>
+              <option value="law_firm">Law firm</option>
+              <option value="court">Court</option>
+              <option value="address">Address</option>
+              <option value="phone">Mobile number</option>
+              <option value="bank_name">Bank</option>
+              <option value="government">Government</option>
+              <option value="institution">Institution</option>
+              <option value="other">Other</option>
             </select>
-            <input type="text" id="re-add-name" placeholder="输入需脱敏的内容" onkeydown="if(event.key==='Enter')addReEntity()">
-            <button class="btn btn-primary" onclick="addReEntity()" style="padding:8px 14px;">添加</button>
+            <input type="text" id="re-add-name" placeholder="Enter content to redact" onkeydown="if(event.key==='Enter')addReEntity()">
+            <button class="btn btn-primary" onclick="addReEntity()" style="padding:8px 14px;">Add</button>
           </div>
           <div class="custom-entity-list" id="re-entities-list" style="margin-top:10px;"></div>
           <div id="re-anonymize-error" class="hidden" style="margin-top:10px;"></div>
           <div style="margin-top:10px;padding:8px 0;border-top:1px solid rgba(255,125,0,0.15);">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-2);">
               <input type="checkbox" id="save-to-dict-chk" style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;">
-              同时保存到个人词典（以后处理文件时自动识别这些词）
+              Also save to my dictionary (auto-detect these terms in future files)
             </label>
           </div>
           <div id="re-anonymizing" class="hidden">
             <div class="loading">
               <div class="spinner"></div>
-              <span>正在重新脱敏...</span>
+              <span>Re-redacting...</span>
             </div>
           </div>
           <div class="btn-group" style="margin-top:14px;">
             <button class="btn btn-primary" onclick="executeReAnonymize()" id="re-anonymize-btn" disabled>
-              &#128274; 继续脱敏
+              &#128274; Redact again
             </button>
           </div>
         </div>
       </div>
 
       <div class="mapping-toggle" onclick="toggleMapping()">
-        <span class="arrow" id="mapping-arrow">&#9654;</span> 查看映射详情
+        <span class="arrow" id="mapping-arrow">&#9654;</span> View mapping details
       </div>
       <div id="mapping-detail" class="hidden">
         <table class="mapping-table">
-          <thead><tr><th>占位符/掩码</th><th>原始值</th><th>类型</th></tr></thead>
+          <thead><tr><th>Placeholder / mask</th><th>Original value</th><th>Type</th></tr></thead>
           <tbody id="mapping-body"></tbody>
         </table>
       </div>
 
       <div class="btn-group" style="margin-top:24px;">
-        <button class="btn btn-outline" onclick="startOver()">&#128260; 处理下一个文件</button>
+        <button class="btn btn-outline" onclick="startOver()">&#128260; Process next file</button>
       </div>
     </div>
 
-    <!-- 词典管理卡片 -->
+    <!-- Personal dictionary management card -->
     <div class="card" id="dict-mgr-card">
       <div class="card-title section-toggle" onclick="toggleDictManager()" id="dict-mgr-toggle">
-        <span>&#128218; 个人词典</span>
+        <span>&#128218; My dictionary</span>
         <span id="dict-count-badge" style="margin-left:auto;font-size:12px;color:var(--text-3);font-weight:400;"></span>
         <span class="arrow" style="margin-left:8px;color:var(--text-3);">&#9654;</span>
       </div>
       <div id="dict-mgr-content" class="hidden">
         <p style="font-size:13px;color:var(--text-2);margin-bottom:12px;">
-          词典中的词条在每次处理文件时自动作为检测目标，无需重复手动添加。
+          Dictionary entries are used as detection targets automatically every time you process a file, so you don't have to add them by hand again.
         </p>
         <div id="dict-entries-list" style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:12px;min-height:40px;">
-          <div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px;">加载中...</div>
+          <div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px;">Loading...</div>
         </div>
         <button onclick="clearUserDict()" class="btn btn-outline" style="color:var(--error);border-color:var(--error);font-size:13px;">
-          &#128465; 清空词典
+          &#128465; Clear dictionary
         </button>
       </div>
     </div>
@@ -1098,7 +1098,7 @@ let state = {
   fileType: '',
   isPdf: false,
   useOcr: false,
-  useCnLlm: true,   // 默认开启（模型在首次启动时已预下载）
+  useCnLlm: true,   // on by default (the model is pre-downloaded on first launch)
   useLlm: false,
   findings: {},
   typeNames: {},
@@ -1149,7 +1149,7 @@ async function uploadFile(file) {
     const data = await res.json();
     if (data.error) { alert(data.error); return; }
     onFileReady(data);
-  } catch (e) { alert('上传失败: ' + e.message); }
+  } catch (e) { alert('Upload failed: ' + e.message); }
 }
 
 function onFileReady(data) {
@@ -1166,10 +1166,10 @@ function onFileReady(data) {
   document.getElementById('drop-zone').classList.add('hidden');
   document.querySelector('.inbox-section').classList.add('hidden');
 
-  // PDF OCR 提示
+  // PDF OCR hint
   if (data.is_pdf || data.is_image) {
     document.getElementById('ocr-option').classList.remove('hidden');
-    // 扫描版PDF / 图片：自动开启 OCR + 自动显示引擎选择
+    // Scanned PDF / image: enable OCR automatically and show the engine picker
     if (data.is_scanned || data.is_image) {
       state.useOcr = true;
       document.getElementById('ocr-switch').classList.add('on');
@@ -1177,7 +1177,7 @@ function onFileReady(data) {
       document.getElementById('ocr-textlayer-notice').classList.add('hidden');
       document.getElementById('ocr-engine-option').classList.remove('hidden');
     } else {
-      // 文字版 PDF：明确提示用户不要开 OCR
+      // Text-based PDF: clearly tell the user not to enable OCR
       state.useOcr = false;
       document.getElementById('ocr-switch').classList.remove('on');
       document.getElementById('ocr-scanned-notice').classList.add('hidden');
@@ -1227,7 +1227,7 @@ function toggleLlm() {
 // ==================== Inbox ====================
 let inboxOpen = true;
 
-// 页面加载时自动刷新 inbox
+// Refresh the inbox automatically when the page loads
 document.addEventListener('DOMContentLoaded', () => { refreshInbox(); });
 
 function toggleInbox() {
@@ -1245,7 +1245,7 @@ async function refreshInbox() {
 
     const list = document.getElementById('inbox-list');
     if (data.files.length === 0) {
-      list.innerHTML = '<div class="inbox-empty">\u{1F4C2} 文件夹为空，请将需要脱敏的文件放入上述文件夹</div>';
+      list.innerHTML = '<div class="inbox-empty">\u{1F4C2} The folder is empty. Drop the files you want to redact into the folder above.</div>';
       return;
     }
     list.innerHTML = data.files.map(f => `
@@ -1257,7 +1257,7 @@ async function refreshInbox() {
             <div class="inbox-item-meta">${formatSize(f.size)}</div>
           </div>
         </div>
-        <span style="color:var(--primary);font-size:13px;">选择 \u2192</span>
+        <span style="color:var(--primary);font-size:13px;">Select \u2192</span>
       </div>
     `).join('');
   } catch (e) { console.error(e); }
@@ -1273,15 +1273,15 @@ async function selectInboxFile(filename) {
     const data = await res.json();
     if (data.error) { alert(data.error); return; }
     onFileReady(data);
-  } catch (e) { alert('选择文件失败: ' + e.message); }
+  } catch (e) { alert('Failed to select file: ' + e.message); }
 }
 
 // ==================== Analyze ====================
 function _fmtSec(s) {
-  if (!s || s < 1) return '0 秒';
-  if (s < 60) return s.toFixed(1) + ' 秒';
+  if (!s || s < 1) return '0 s';
+  if (s < 60) return s.toFixed(1) + ' s';
   const m = Math.floor(s / 60), sec = Math.round(s - m * 60);
-  return `${m} 分 ${sec} 秒`;
+  return `${m} min ${sec} s`;
 }
 
 async function analyzeDocument() {
@@ -1289,19 +1289,19 @@ async function analyzeDocument() {
   document.getElementById('analyzing').classList.remove('hidden');
   document.getElementById('analyze-error').classList.add('hidden');
   document.getElementById('analyze-progress-bar').style.width = '0%';
-  document.getElementById('analyze-pct-label').textContent = '准备中...';
+  document.getElementById('analyze-pct-label').textContent = 'Preparing...';
   document.getElementById('analyze-time-label').textContent = '';
   const llmMsg = state.useLlm
-    ? '正在分析文档（首次加载 OpenAI 模型需 10-20 秒）...'
+    ? 'Analyzing document (first load of the OpenAI model takes 10-20 s)...'
     : state.useCnLlm
-      ? '正在分析文档（首次加载中文 NER 模型需 5-10 秒）...'
-      : '正在分析文档，请稍候...';
+      ? 'Analyzing document (first load of the Chinese NER model takes 5-10 s)...'
+      : 'Analyzing document, please wait...';
   document.getElementById('analyzing-msg').textContent = state.useOcr
-    ? '正在 OCR 识别中...'
+    ? 'Running OCR...'
     : llmMsg;
 
   try {
-    // 启动异步分析
+    // Start async analysis
     const startRes = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1317,14 +1317,14 @@ async function analyzeDocument() {
     if (!startRes.ok) {
       const errEl = document.getElementById('analyze-error');
       errEl.className = 'alert alert-error';
-      errEl.textContent = startData.error || '启动失败';
+      errEl.textContent = startData.error || 'Failed to start';
       errEl.classList.remove('hidden');
       document.getElementById('analyze-btn').disabled = false;
       document.getElementById('analyzing').classList.add('hidden');
       return;
     }
 
-    // 轮询进度
+    // Poll for progress
     const data = await pollAnalyzeStatus(state.sessionId);
     if (!data) return;
 
@@ -1336,7 +1336,7 @@ async function analyzeDocument() {
   } catch (e) {
     const errEl = document.getElementById('analyze-error');
     errEl.className = 'alert alert-error';
-    errEl.textContent = '分析失败: ' + e.message;
+    errEl.textContent = 'Analysis failed: ' + e.message;
     errEl.classList.remove('hidden');
   } finally {
     document.getElementById('analyze-btn').disabled = false;
@@ -1354,7 +1354,7 @@ function pollAnalyzeStatus(sessionId) {
       const now = Date.now() / 1000;
       const drift = lastFetchClient - (lastData.now || lastFetchClient);
       let pct = lastData.percent || 0;
-      // OCR 阶段：用本地时钟内插，让进度条平滑
+      // OCR stage: interpolate with the local clock so the bar moves smoothly
       if (lastData.stage === 'ocr' && lastData.started_at) {
         const elapsed = Math.max(0.1, now - drift - lastData.started_at);
         const eta = lastData.eta_s || elapsed * 2;
@@ -1363,12 +1363,12 @@ function pollAnalyzeStatus(sessionId) {
       }
       document.getElementById('analyze-progress-bar').style.width = pct.toFixed(1) + '%';
       const stageLabel = ({
-        queued: '排队中', ocr: 'OCR 识别中', detect: '检测敏感信息中', done: '完成', error: '错误',
-        ocr_page_done: 'OCR 识别中',
-      }[lastData.stage] || '处理中');
+        queued: 'Queued', ocr: 'Running OCR', detect: 'Detecting sensitive info', done: 'Done', error: 'Error',
+        ocr_page_done: 'Running OCR',
+      }[lastData.stage] || 'Processing');
       let pageInfo = '';
       if (lastData.stage === 'ocr' && lastData.total > 0) {
-        pageInfo = `（第 ${lastData.current}/${lastData.total} 页）`;
+        pageInfo = ` (page ${lastData.current}/${lastData.total})`;
       }
       document.getElementById('analyze-pct-label').textContent = `${stageLabel}${pageInfo} · ${pct.toFixed(0)}%`;
 
@@ -1379,11 +1379,11 @@ function pollAnalyzeStatus(sessionId) {
       const remainEst = Math.max(0, (lastData.eta_s || 0) - elapsedClient);
       const tEl = document.getElementById('analyze-time-label');
       if (lastData.stage === 'done' && lastData.elapsed_s) {
-        tEl.textContent = `用时 ${_fmtSec(lastData.elapsed_s)}`;
+        tEl.textContent = `Took ${_fmtSec(lastData.elapsed_s)}`;
       } else if (lastData.eta_s > 0) {
-        tEl.textContent = `已用 ${_fmtSec(elapsedClient)} · 预计还需 ${_fmtSec(remainEst)}`;
+        tEl.textContent = `Elapsed ${_fmtSec(elapsedClient)} · about ${_fmtSec(remainEst)} left`;
       } else {
-        tEl.textContent = `已用 ${_fmtSec(elapsedClient)}`;
+        tEl.textContent = `Elapsed ${_fmtSec(elapsedClient)}`;
       }
     };
 
@@ -1393,7 +1393,7 @@ function pollAnalyzeStatus(sessionId) {
         const d = await r.json();
         if (!r.ok) {
           if (tickTimer) clearInterval(tickTimer);
-          reject(new Error(d.error || '查询进度失败'));
+          reject(new Error(d.error || 'Failed to query progress'));
           return;
         }
         lastData = d;
@@ -1403,7 +1403,7 @@ function pollAnalyzeStatus(sessionId) {
           if (tickTimer) clearInterval(tickTimer);
           const errEl = document.getElementById('analyze-error');
           errEl.className = 'alert alert-error';
-          errEl.textContent = '分析失败: ' + (d.error || '');
+          errEl.textContent = 'Analysis failed: ' + (d.error || '');
           errEl.classList.remove('hidden');
           resolve(null);
           return;
@@ -1426,9 +1426,9 @@ function pollAnalyzeStatus(sessionId) {
 
 function renderFindings(data) {
   document.getElementById('findings-summary').innerHTML =
-    `\u{1F50D} 共发现 <strong>${data.total_findings}</strong> 处敏感信息，涉及 <strong>${data.type_count}</strong> 种类型`;
+    `\u{1F50D} Found <strong>${data.total_findings}</strong> sensitive items across <strong>${data.type_count}</strong> types`;
 
-  // 存储可编辑的 findings 副本
+  // Store an editable copy of the findings
   state.editableFindings = {};
   for (const [type, values] of Object.entries(data.findings)) {
     state.editableFindings[type] = values.map(v => ({
@@ -1458,7 +1458,7 @@ function rebuildFindingsUI() {
       <div class="entity-group-header">
         <span>${escHtml(typeName)} (${type})</span>
         <div class="entity-group-header-right">
-          <button class="entity-btn-del-all" onclick="deleteAllEntitiesOfType('${type}')" title="删除该分类全部识别字段">删除全部</button>
+          <button class="entity-btn-del-all" onclick="deleteAllEntitiesOfType('${type}')" title="Delete all detected items in this category">Delete all</button>
           <span class="entity-group-count">${items.length}</span>
         </div>
       </div>
@@ -1476,8 +1476,8 @@ function rebuildFindingsUI() {
           ${ctxHtml}
         </div>
         <div class="entity-actions">
-          <button class="entity-btn" onclick="editEntity('${type}',${i})" title="编辑">编辑</button>
-          <button class="entity-btn entity-btn-del" onclick="deleteEntity('${type}',${i})" title="删除">删除</button>
+          <button class="entity-btn" onclick="editEntity('${type}',${i})" title="Edit">Edit</button>
+          <button class="entity-btn entity-btn-del" onclick="deleteEntity('${type}',${i})" title="Delete">Delete</button>
         </div>
       </div>`;
     }
@@ -1486,14 +1486,14 @@ function rebuildFindingsUI() {
 
   list.innerHTML = html;
 
-  // 更新摘要
+  // Update the summary
   document.getElementById('findings-summary').innerHTML =
-    `\u{1F50D} 共发现 <strong>${totalCount}</strong> 处敏感信息，涉及 <strong>${typeCount}</strong> 种类型`;
+    `\u{1F50D} Found <strong>${totalCount}</strong> sensitive items across <strong>${typeCount}</strong> types`;
 }
 
 function toggleEntityV2(type, idx, checked) {
   state.editableFindings[type][idx].enabled = checked;
-  // 同步到 excludedEntities
+  // Sync to excludedEntities
   const item = state.editableFindings[type][idx];
   if (!checked) {
     state.excludedEntities.push({ type, name: item.current });
@@ -1511,8 +1511,8 @@ function editEntity(type, idx) {
     <input type="checkbox" ${item.enabled ? 'checked' : ''} disabled style="opacity:0.5">
     <input type="text" class="entity-edit-input" id="edit_${type}_${idx}" value="${escAttr(oldVal)}">
     <div class="entity-actions">
-      <button class="entity-btn" onclick="saveEntity('${type}',${idx})" style="color:var(--success);border-color:var(--success);">保存</button>
-      <button class="entity-btn" onclick="rebuildFindingsUI()">取消</button>
+      <button class="entity-btn" onclick="saveEntity('${type}',${idx})" style="color:var(--success);border-color:var(--success);">Save</button>
+      <button class="entity-btn" onclick="rebuildFindingsUI()">Cancel</button>
     </div>`;
 
   const input = document.getElementById(`edit_${type}_${idx}`);
@@ -1532,22 +1532,22 @@ function saveEntity(type, idx) {
   const item = state.editableFindings[type][idx];
   const oldVal = item.current;
 
-  // 更新 excludedEntities 中的引用
+  // Update the reference in excludedEntities
   if (!item.enabled) {
     state.excludedEntities = state.excludedEntities.filter(e => !(e.type === type && e.name === oldVal));
     state.excludedEntities.push({ type, name: newVal });
   }
 
-  // 如果值变了，旧值要排除，新值作为自定义实体添加
+  // If the value changed, exclude the old value and add the new one as a custom entity
   if (newVal !== item.original) {
-    // 排除旧的自动检测结果
+    // Exclude the old auto-detected result
     if (!state.excludedEntities.some(e => e.type === type && e.name === item.original)) {
       state.excludedEntities.push({ type, name: item.original });
     }
-    // 新值作为自定义实体
+    // New value becomes a custom entity
     if (!state.customEntities.some(e => e.type === type && e.name === newVal)) {
       state.customEntities.push({ type, name: newVal });
-      // 同步到后端
+      // Sync to the backend
       fetch('/api/entities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1563,7 +1563,7 @@ function saveEntity(type, idx) {
 
 function deleteEntity(type, idx) {
   const item = state.editableFindings[type][idx];
-  // 加入排除列表
+  // Add to the exclusion list
   if (!state.excludedEntities.some(e => e.type === type && e.name === item.current)) {
     state.excludedEntities.push({ type, name: item.current });
   }
@@ -1600,7 +1600,7 @@ async function addEntity() {
   const entity = { type, name };
   state.customEntities.push(entity);
 
-  // 通知后端
+  // Notify the backend
   await fetch('/api/entities', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1647,12 +1647,12 @@ function renderCustomEntities() {
 
 // ==================== Anonymize ====================
 async function anonymizeDocument() {
-  // 多格式勾选
+  // Selected output formats
   const formats = Array.from(document.querySelectorAll('input[name="format"]:checked')).map(el => el.value);
   if (formats.length === 0) {
     const errEl = document.getElementById('anonymize-error');
     errEl.className = 'alert alert-error';
-    errEl.textContent = '请至少勾选一种输出格式';
+    errEl.textContent = 'Please select at least one output format';
     errEl.classList.remove('hidden');
     return;
   }
@@ -1669,7 +1669,7 @@ async function anonymizeDocument() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: state.sessionId,
-        output_format: formats,  // 数组
+        output_format: formats,  // array
         mask_strategy: strategy,
         placeholder_style: phStyle,
         excluded_entities: state.excludedEntities,
@@ -1691,7 +1691,7 @@ async function anonymizeDocument() {
   } catch (e) {
     const errEl = document.getElementById('anonymize-error');
     errEl.className = 'alert alert-error';
-    errEl.textContent = '脱敏失败: ' + e.message;
+    errEl.textContent = 'Redaction failed: ' + e.message;
     errEl.classList.remove('hidden');
   } finally {
     document.getElementById('anonymize-btn').disabled = false;
@@ -1703,10 +1703,10 @@ function renderResults(data) {
   document.getElementById('stat-entities').textContent = data.total_matched;
   document.getElementById('stat-replacements').textContent = data.replacements_made;
 
-  // 展示所有生成的输出文件路径
+  // Show every generated output file path
   const pathsList = document.getElementById('output-paths-list');
   const outputPaths = data.output_paths || {};
-  const fmtLabels = { md: 'Markdown', docx: 'Word', pdf: 'PDF', txt: '纯文本' };
+  const fmtLabels = { md: 'Markdown', docx: 'Word', pdf: 'PDF', txt: 'Plain text' };
   if (Object.keys(outputPaths).length) {
     pathsList.innerHTML = Object.entries(outputPaths)
       .map(([fmt, p]) => `<div>• <b>${fmtLabels[fmt] || fmt.toUpperCase()}</b>: ${escHtml(p)}</div>`)
@@ -1715,7 +1715,7 @@ function renderResults(data) {
     pathsList.innerHTML = `<div>${escHtml(data.output_path)}</div>`;
   }
 
-  // 每种格式一个下载按钮
+  // One download button per format
   const btnsContainer = document.getElementById('download-btns');
   btnsContainer.innerHTML = '';
   const icons = { md: '\u{1F4DD}', docx: '\u{1F4C4}', pdf: '\u{1F4D5}', txt: '\u{1F4C3}' };
@@ -1723,31 +1723,31 @@ function renderResults(data) {
     const btn = document.createElement('a');
     btn.className = 'btn btn-primary';
     btn.href = `/api/download/${state.sessionId}?fmt=${fmt}`;
-    btn.innerHTML = `${icons[fmt] || '⬇'} 下载 ${(fmtLabels[fmt] || fmt).toUpperCase()}`;
+    btn.innerHTML = `${icons[fmt] || '⬇'} Download ${(fmtLabels[fmt] || fmt).toUpperCase()}`;
     btnsContainer.appendChild(btn);
   }
-  // 映射表按钮
+  // Mapping table button
   const mapBtn = document.createElement('a');
   mapBtn.className = 'btn btn-outline';
   mapBtn.href = '/api/download-mapping/' + state.sessionId;
-  mapBtn.innerHTML = '\u{1F4CB} 下载映射表';
+  mapBtn.innerHTML = '\u{1F4CB} Download mapping table';
   btnsContainer.appendChild(mapBtn);
-  // "仍有未脱敏内容"按钮
+  // "Still some unredacted content" button
   const reBtn = document.createElement('button');
   reBtn.className = 'btn btn-outline';
   reBtn.style.color = 'var(--warning)';
   reBtn.style.borderColor = 'var(--warning)';
   reBtn.onclick = toggleReAnonymize;
-  reBtn.innerHTML = '⚠ 仍有未脱敏内容';
+  reBtn.innerHTML = '⚠ Still some unredacted content';
   btnsContainer.appendChild(reBtn);
 
-  // 映射表
+  // Mapping table
   const body = document.getElementById('mapping-body');
   let html = '';
   for (const [placeholder, info] of Object.entries(data.mapping || {})) {
     html += `<tr><td>${escHtml(placeholder)}</td><td>${escHtml(info.original)}</td><td>${escHtml(info.type)}</td></tr>`;
   }
-  body.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:var(--text-3)">无映射记录</td></tr>';
+  body.innerHTML = html || '<tr><td colspan="3" style="text-align:center;color:var(--text-3)">No mapping records</td></tr>';
 }
 
 function toggleMapping() {
@@ -1769,7 +1769,7 @@ function addReEntity() {
   const name = document.getElementById('re-add-name').value.trim();
   if (!name) return;
 
-  // 支持逗号、顿号、空格分隔的批量输入
+  // Accept batch input separated by commas, Chinese commas, enumeration marks or spaces
   const names = name.split(/[,，、\s]+/).filter(n => n.length > 0);
   for (const n of names) {
     if (!reEntities.some(e => e.type === type && e.name === n)) {
@@ -1823,10 +1823,10 @@ async function executeReAnonymize() {
       return;
     }
 
-    // 更新结果显示
+    // Update the results display
     renderResults(data);
 
-    // 如果勾选"保存到词典"，持久化这批实体
+    // If "save to dictionary" is checked, persist this batch of entities
     const saveToDict = document.getElementById('save-to-dict-chk').checked;
     if (saveToDict && reEntities.length > 0) {
       await fetch('/api/user-dict/add', {
@@ -1834,24 +1834,24 @@ async function executeReAnonymize() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries: reEntities }),
       });
-      loadUserDict();  // 刷新词典显示
+      loadUserDict();  // Refresh the dictionary display
     }
 
-    // 清空已添加的实体，隐藏面板
+    // Clear the added entities and hide the panel
     reEntities = [];
     renderReEntities();
     document.getElementById('save-to-dict-chk').checked = false;
     document.getElementById('re-anonymize-panel').classList.add('hidden');
 
-    // 显示成功提示
+    // Show a success message
     const subtitle = document.querySelector('.result-subtitle');
-    subtitle.textContent = `已补充脱敏 ${data.new_entities_added} 个实体，文件已更新${saveToDict ? '，词条已保存到词典' : ''}`;
+    subtitle.textContent = `Redacted ${data.new_entities_added} more entities, files updated${saveToDict ? ', entries saved to your dictionary' : ''}`;
     subtitle.style.color = 'var(--success)';
 
   } catch (e) {
     const errEl = document.getElementById('re-anonymize-error');
     errEl.className = 'alert alert-error';
-    errEl.textContent = '继续脱敏失败: ' + e.message;
+    errEl.textContent = 'Additional redaction failed: ' + e.message;
     errEl.classList.remove('hidden');
   } finally {
     document.getElementById('re-anonymize-btn').disabled = reEntities.length === 0;
@@ -1870,11 +1870,11 @@ async function loadUserDict() {
     const badge = document.getElementById('dict-count-badge');
     if (badge) {
       badge.textContent = userDictEntries.length > 0
-        ? `（${userDictEntries.length} 个词条）`
-        : '（空）';
+        ? `(${userDictEntries.length} entries)`
+        : '(empty)';
     }
     renderDictEntries();
-  } catch (e) { console.error('加载词典失败', e); }
+  } catch (e) { console.error('Failed to load dictionary', e); }
 }
 
 function toggleDictManager() {
@@ -1889,7 +1889,7 @@ function renderDictEntries() {
   const el = document.getElementById('dict-entries-list');
   if (!el) return;
   if (userDictEntries.length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px;">词典为空</div>';
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px;">The dictionary is empty</div>';
     return;
   }
   el.innerHTML = userDictEntries.map((e, i) => {
@@ -1899,7 +1899,7 @@ function renderDictEntries() {
         <span class="dict-type-badge">${escHtml(typeName)}</span>
         <span>${escHtml(e.name)}</span>
       </div>
-      <button class="dict-remove-btn" onclick="removeDictEntry(${i})" title="删除">&times;</button>
+      <button class="dict-remove-btn" onclick="removeDictEntry(${i})" title="Delete">&times;</button>
     </div>`;
   }).join('');
 }
@@ -1915,7 +1915,7 @@ async function removeDictEntry(idx) {
 }
 
 async function clearUserDict() {
-  if (!confirm('确定清空全部词典词条？')) return;
+  if (!confirm('Clear all dictionary entries?')) return;
   await fetch('/api/user-dict/clear', { method: 'POST' });
   loadUserDict();
 }
@@ -1951,7 +1951,7 @@ function switchMode(mode) {
   const sBtn = document.getElementById('mode-single-btn');
   const bBtn = document.getElementById('mode-batch-btn');
   const rBtn = document.getElementById('mode-restore-btn');
-  // 默认全隐藏
+  // Hide everything by default
   single.classList.add('hidden'); stepper.classList.add('hidden');
   batch.classList.add('hidden'); restore.classList.add('hidden');
   const inactive = 'padding:8px 22px;border:none;background:transparent;color:#666;border-radius:7px;font-weight:500;font-size:14px;';
@@ -1977,7 +1977,7 @@ function loadRestoreMapping(input) {
   reader.onload = (e) => {
     document.getElementById('restore-map-input').value = e.target.result;
     document.getElementById('restore-map-file-label').textContent =
-      `✓ 已加载 ${f.name}（${(f.size / 1024).toFixed(1)} KB）`;
+      `✓ Loaded ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
     document.getElementById('restore-map-clear').classList.remove('hidden');
   };
   reader.readAsText(f);
@@ -1987,14 +1987,14 @@ function clearRestoreText() {
   document.getElementById('restore-text-file').value = '';
   document.getElementById('restore-text-input').value = '';
   document.getElementById('restore-text-file-label').textContent =
-    '点击选择脱敏后文件（.docx / .pdf / .txt）';
+    'Click to select redacted file (.docx / .pdf / .txt)';
   document.getElementById('restore-text-clear').classList.add('hidden');
 }
 
 function clearRestoreMap() {
   document.getElementById('restore-map-file').value = '';
   document.getElementById('restore-map-input').value = '';
-  document.getElementById('restore-map-file-label').textContent = '点击选择 _mapping.json 文件';
+  document.getElementById('restore-map-file-label').textContent = 'Click to select the _mapping.json file';
   document.getElementById('restore-map-clear').classList.add('hidden');
 }
 
@@ -2005,33 +2005,33 @@ async function loadRestoreText(input) {
   const clearBtn = document.getElementById('restore-text-clear');
   const ext = f.name.split('.').pop().toLowerCase();
   if (ext === 'txt' || ext === 'md') {
-    // 纯文本本地直读
+    // Plain text: read locally
     const reader = new FileReader();
     reader.onload = (e) => {
       document.getElementById('restore-text-input').value = e.target.result;
-      lbl.textContent = `✓ 已加载 ${f.name}（${(f.size / 1024).toFixed(1)} KB）`;
+      lbl.textContent = `✓ Loaded ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
       clearBtn.classList.remove('hidden');
     };
     reader.readAsText(f);
     return;
   }
-  // pdf/docx 走后端抽文字
-  lbl.textContent = `⏳ 正在解析 ${f.name}...`;
+  // pdf/docx: extract text on the backend
+  lbl.textContent = `⏳ Parsing ${f.name}...`;
   try {
     const fd = new FormData();
     fd.append('file', f);
     const r = await fetch('/api/restore/extract', { method: 'POST', body: fd });
     const data = await r.json();
     if (!r.ok) {
-      lbl.textContent = `✗ ${data.error || '解析失败'}`;
+      lbl.textContent = `✗ ${data.error || 'Parsing failed'}`;
       clearBtn.classList.remove('hidden');
       return;
     }
     document.getElementById('restore-text-input').value = data.text;
-    lbl.textContent = `✓ 已加载 ${f.name}（${data.chars} 字）`;
+    lbl.textContent = `✓ Loaded ${f.name} (${data.chars} chars)`;
     clearBtn.classList.remove('hidden');
   } catch (e) {
-    lbl.textContent = `✗ 解析失败：${e.message}`;
+    lbl.textContent = `✗ Parsing failed: ${e.message}`;
     clearBtn.classList.remove('hidden');
   }
 }
@@ -2041,10 +2041,10 @@ function toggleRestoreMapPaste() {
   const link = document.getElementById('restore-map-paste-toggle');
   if (ta.classList.contains('hidden')) {
     ta.classList.remove('hidden');
-    link.textContent = '收起粘贴框 ▴';
+    link.textContent = 'Hide paste box ▴';
   } else {
     ta.classList.add('hidden');
-    link.textContent = '高级：直接粘贴 JSON 内容 ▾';
+    link.textContent = 'Advanced: paste JSON content directly ▾';
   }
 }
 
@@ -2055,7 +2055,7 @@ async function doRestore() {
   errEl.classList.add('hidden');
   if (!text || !mapRaw) {
     errEl.className = 'alert alert-error';
-    errEl.textContent = '请同时提供脱敏后文本和映射字典 JSON';
+    errEl.textContent = 'Please provide both the redacted text and the mapping JSON';
     errEl.classList.remove('hidden');
     return;
   }
@@ -2064,7 +2064,7 @@ async function doRestore() {
     mapping = JSON.parse(mapRaw);
   } catch (e) {
     errEl.className = 'alert alert-error';
-    errEl.textContent = '映射字典 JSON 解析失败：' + e.message;
+    errEl.textContent = 'Failed to parse the mapping JSON: ' + e.message;
     errEl.classList.remove('hidden');
     return;
   }
@@ -2077,16 +2077,16 @@ async function doRestore() {
     const data = await r.json();
     if (!r.ok) {
       errEl.className = 'alert alert-error';
-      errEl.textContent = data.error || '还原失败';
+      errEl.textContent = data.error || 'Restore failed';
       errEl.classList.remove('hidden');
       return;
     }
     document.getElementById('restore-output').value = data.restored;
-    document.getElementById('restore-stats').textContent = `（${data.replacements} 处占位符已还原）`;
+    document.getElementById('restore-stats').textContent = `(${data.replacements} placeholders restored)`;
     document.getElementById('restore-result-card').classList.remove('hidden');
   } catch (e) {
     errEl.className = 'alert alert-error';
-    errEl.textContent = '请求失败：' + e.message;
+    errEl.textContent = 'Request failed: ' + e.message;
     errEl.classList.remove('hidden');
   }
 }
@@ -2098,8 +2098,8 @@ function resetRestore() {
   document.getElementById('restore-text-file').value = '';
   document.getElementById('restore-map-file').value = '';
   document.getElementById('restore-text-file-label').textContent =
-    '点击选择脱敏后文件（.docx / .pdf / .txt）';
-  document.getElementById('restore-map-file-label').textContent = '点击选择 _mapping.json 文件';
+    'Click to select redacted file (.docx / .pdf / .txt)';
+  document.getElementById('restore-map-file-label').textContent = 'Click to select the _mapping.json file';
   document.getElementById('restore-text-clear').classList.add('hidden');
   document.getElementById('restore-map-clear').classList.add('hidden');
   document.getElementById('restore-result-card').classList.add('hidden');
@@ -2118,7 +2118,7 @@ function downloadRestoreOutput() {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '还原后文本.txt';
+  a.download = 'restored_text.txt';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -2142,24 +2142,24 @@ async function batchUpload(files) {
   try {
     const r = await fetch('/api/batch/upload', { method: 'POST', body: fd });
     const data = await r.json();
-    if (!r.ok) { alert(data.error || '上传失败'); return; }
+    if (!r.ok) { alert(data.error || 'Upload failed'); return; }
     batchState.id = data.batch_id;
     batchState.items = data.items;
     renderBatchList();
     document.getElementById('batch-file-list').classList.remove('hidden');
     document.getElementById('batch-options').classList.remove('hidden');
   } catch (e) {
-    alert('上传失败: ' + e.message);
+    alert('Upload failed: ' + e.message);
   }
 }
 
 function renderBatchList() {
-  document.getElementById('batch-count').textContent = `（共 ${batchState.items.length} 个）`;
+  document.getElementById('batch-count').textContent = `(${batchState.items.length} total)`;
   const html = batchState.items.map(it => {
     const sizeKb = (it.size / 1024).toFixed(1);
     const status = it.status === 'rejected'
-      ? `<span style="color:#ef4444;">✗ ${it.error || '不支持'}</span>`
-      : `<span style="color:#10b981;">✓ 已就绪</span>`;
+      ? `<span style="color:#ef4444;">✗ ${it.error || 'Unsupported'}</span>`
+      : `<span style="color:#10b981;">✓ Ready</span>`;
     return `
       <div style="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;">
         <span style="flex:0 0 30px;color:#999;">#${it.idx}</span>
@@ -2191,12 +2191,12 @@ async function startBatch() {
       }),
     });
     const data = await r.json();
-    if (!r.ok) { alert(data.error || '启动失败'); document.getElementById('batch-start-btn').disabled = false; return; }
+    if (!r.ok) { alert(data.error || 'Failed to start'); document.getElementById('batch-start-btn').disabled = false; return; }
     document.getElementById('batch-progress').classList.remove('hidden');
     document.getElementById('batch-file-list').classList.add('hidden');
     pollBatch();
   } catch (e) {
-    alert('启动失败: ' + e.message);
+    alert('Failed to start: ' + e.message);
     document.getElementById('batch-start-btn').disabled = false;
   }
 }
@@ -2211,7 +2211,7 @@ async function pollBatch() {
     batchState.lastFetchClient = Date.now() / 1000;
     renderBatchProgress(data);
     if (!data.all_finished) {
-      // 正在跑时频繁轮询 + 本地 tick 更新进度（让进度条平滑增长）
+      // While running, poll frequently and tick locally so the bar grows smoothly
       batchState.polling = setTimeout(pollBatch, 1500);
       if (!batchState.tickTimer) {
         batchState.tickTimer = setInterval(() => {
@@ -2228,17 +2228,17 @@ async function pollBatch() {
 }
 
 function _fmtDuration(s) {
-  if (s < 60) return s.toFixed(1) + ' 秒';
+  if (s < 60) return s.toFixed(1) + ' s';
   const m = Math.floor(s / 60), sec = Math.round(s - m * 60);
-  return `${m} 分 ${sec} 秒`;
+  return `${m} min ${sec} s`;
 }
 
 function renderBatchProgress(data) {
-  // 服务器时间和本地时间的偏差（让 elapsed 跨网络抖动也准）
+  // Offset between server time and local time (keeps elapsed accurate despite network jitter)
   const now = Date.now() / 1000;
   const drift = (batchState.lastFetchClient || now) - (data.now || now);
 
-  // 估计总剩余时间（所有未完成的 ETA 减去已耗）
+  // Estimate total time remaining (sum of unfinished ETAs minus elapsed)
   let pendingTotalSec = 0, doneCount = 0, totalElapsed = 0;
   let avgPercent = 0;
   for (const it of data.items) {
@@ -2255,44 +2255,44 @@ function renderBatchProgress(data) {
       avgPercent += pct;
       pendingTotalSec += Math.max(0, eta - elapsed);
     } else {
-      // 排队中
+      // Queued
       pendingTotalSec += it.eta_s || 5;
     }
   }
   const overall = data.items.length ? avgPercent / data.items.length : 0;
   document.getElementById('batch-progress-bar').style.width = overall.toFixed(1) + '%';
 
-  let label = `（${data.done}/${data.total} 完成 · ${overall.toFixed(0)}%）`;
+  let label = `(${data.done}/${data.total} done · ${overall.toFixed(0)}%)`;
   if (!data.all_finished && pendingTotalSec > 0) {
-    label += ` · 预计还需 ${_fmtDuration(pendingTotalSec)}`;
+    label += ` · about ${_fmtDuration(pendingTotalSec)} left`;
   }
   if (data.all_finished && totalElapsed > 0) {
-    label += ` · 总耗时 ${_fmtDuration(totalElapsed)}`;
+    label += ` · total ${_fmtDuration(totalElapsed)}`;
   }
   document.getElementById('batch-progress-label').textContent = label;
 
   const html = data.items.map(it => {
     let badge, color, itemPct = 0, etaTxt = '';
     if (it.status === 'done') {
-      badge = `✓ 完成 (${(it.elapsed_s || 0).toFixed(1)}s)`; color = '#10b981'; itemPct = 100;
+      badge = `✓ Done (${(it.elapsed_s || 0).toFixed(1)}s)`; color = '#10b981'; itemPct = 100;
     } else if (it.status === 'error') {
-      badge = '✗ 错误'; color = '#ef4444'; itemPct = 100;
+      badge = '✗ Error'; color = '#ef4444'; itemPct = 100;
     } else if (it.status === 'rejected') {
-      badge = '✗ 跳过'; color = '#999'; itemPct = 100;
+      badge = '✗ Skipped'; color = '#999'; itemPct = 100;
     } else if (it.status === 'processing' && it.started_at) {
       const elapsed = Math.max(0.1, now - drift - it.started_at);
       const eta = it.eta_s || elapsed * 2;
       itemPct = Math.min(98, (elapsed / eta) * 100);
       const remain = Math.max(0, eta - elapsed);
-      const stageLabel = it.stage === 'detect' ? '检测中' : '脱敏中';
+      const stageLabel = it.stage === 'detect' ? 'Detecting' : 'Redacting';
       badge = `⏳ ${stageLabel} ${itemPct.toFixed(0)}%`; color = '#3b82f6';
-      etaTxt = `已 ${elapsed.toFixed(0)}s / 约 ${eta.toFixed(0)}s`;
+      etaTxt = `${elapsed.toFixed(0)}s elapsed / ~${eta.toFixed(0)}s`;
     } else {
-      badge = '排队中'; color = '#999'; itemPct = 0;
-      if (it.eta_s) etaTxt = `预计 ${it.eta_s.toFixed(0)}s`;
+      badge = 'Queued'; color = '#999'; itemPct = 0;
+      if (it.eta_s) etaTxt = `~${it.eta_s.toFixed(0)}s`;
     }
     const detail = it.status === 'done'
-      ? `${it.total_matched} 实体 · ${it.replacements_made} 处替换${it.is_scanned ? ' · 扫描版' : ''}`
+      ? `${it.total_matched} entities · ${it.replacements_made} replacements${it.is_scanned ? ' · scanned' : ''}`
       : (it.error ? escHtml(it.error.slice(0, 80)) : etaTxt);
     return `
       <div style="padding:10px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;">
@@ -2356,8 +2356,8 @@ function hashStr(s) {
 </script>
 
 <div style="text-align:center;padding:24px 16px 32px;color:var(--text-3);font-size:12px;line-height:1.8;">
-  <div style="margin-bottom:4px;">法律文档脱敏工具 &middot; 完全本地运行 &middot; 不联网不上传</div>
-  <div>Made with &#10084;&#65039; by <strong style="color:var(--text-2);">黄灵宝同学</strong></div>
+  <div style="margin-bottom:4px;">Legal Anonymizer &middot; Runs fully on your machine &middot; No network, no uploads</div>
+  <div>Made with &#10084;&#65039; by <strong style="color:var(--text-2);">Lingbao Huang</strong></div>
 </div>
 
 </body>

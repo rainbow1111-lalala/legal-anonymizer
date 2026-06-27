@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-生成《法律文档脱敏工具 - 首次使用指南》PDF
+Generate the "Legal Anonymizer - Getting Started Guide" PDF.
 """
 
 import os
@@ -20,9 +20,9 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 
-# ============ 字体注册 ============
+# ============ Font registration ============
 def register_fonts():
-    """注册中文字体"""
+    """Register Chinese fonts."""
     font_paths = {
         'PingFang': [
             '/System/Library/Fonts/PingFang.ttc',
@@ -36,7 +36,7 @@ def register_fonts():
     }
 
     registered = False
-    # macOS 字体
+    # macOS fonts
     for font_path in font_paths['PingFang']:
         if os.path.exists(font_path):
             try:
@@ -50,8 +50,8 @@ def register_fonts():
     if not registered:
         # Windows / Linux fallback
         fallback_fonts = [
-            'C:/Windows/Fonts/msyh.ttc',      # 微软雅黑
-            'C:/Windows/Fonts/simsun.ttc',     # 宋体
+            'C:/Windows/Fonts/msyh.ttc',      # Microsoft YaHei
+            'C:/Windows/Fonts/simsun.ttc',     # SimSun
             '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
         ]
         for font_path in fallback_fonts:
@@ -65,30 +65,30 @@ def register_fonts():
                     continue
 
     if not registered:
-        print("警告: 未找到中文字体，PDF可能无法正确显示中文")
-        # 使用 Helvetica 作为回退
+        print("Warning: no Chinese font found. The PDF may not display Chinese correctly.")
+        # Fall back to Helvetica
         pdfmetrics.registerFontFamily('PingFang', normal='Helvetica', bold='Helvetica-Bold')
 
 
 register_fonts()
 
 
-# ============ 颜色定义 ============
-PRIMARY = HexColor('#1a5276')      # 深蓝
-ACCENT = HexColor('#2980b9')       # 亮蓝
-SUCCESS = HexColor('#27ae60')      # 绿色
-WARNING = HexColor('#e67e22')      # 橙色
-DANGER = HexColor('#c0392b')       # 红色
-BG_LIGHT = HexColor('#f8f9fa')     # 浅灰背景
-BG_BLUE = HexColor('#eaf2f8')      # 浅蓝背景
-BORDER = HexColor('#bdc3c7')       # 边框灰
-TEXT_DARK = HexColor('#2c3e50')    # 深色文字
-TEXT_GRAY = HexColor('#7f8c8d')    # 灰色文字
+# ============ Color definitions ============
+PRIMARY = HexColor('#1a5276')      # Dark blue
+ACCENT = HexColor('#2980b9')       # Bright blue
+SUCCESS = HexColor('#27ae60')      # Green
+WARNING = HexColor('#e67e22')      # Orange
+DANGER = HexColor('#c0392b')       # Red
+BG_LIGHT = HexColor('#f8f9fa')     # Light gray background
+BG_BLUE = HexColor('#eaf2f8')      # Light blue background
+BORDER = HexColor('#bdc3c7')       # Border gray
+TEXT_DARK = HexColor('#2c3e50')    # Dark text
+TEXT_GRAY = HexColor('#7f8c8d')    # Gray text
 
 
-# ============ 样式定义 ============
+# ============ Style definitions ============
 def create_styles():
-    """创建PDF样式"""
+    """Create the PDF styles."""
     styles = {}
 
     styles['title'] = ParagraphStyle(
@@ -226,9 +226,9 @@ def create_styles():
     return styles
 
 
-# ============ 辅助函数 ============
+# ============ Helper functions ============
 def make_tip_box(text, styles, box_type='tip'):
-    """创建提示框"""
+    """Create a callout box."""
     if box_type == 'tip':
         bg = HexColor('#e8f8f5')
         border_color = SUCCESS
@@ -236,15 +236,15 @@ def make_tip_box(text, styles, box_type='tip'):
     elif box_type == 'warning':
         bg = HexColor('#fef9e7')
         border_color = WARNING
-        prefix = '注意'
+        prefix = 'Caution'
     elif box_type == 'danger':
         bg = HexColor('#fdedec')
         border_color = DANGER
-        prefix = '重要'
+        prefix = 'Important'
     else:
         bg = BG_BLUE
         border_color = ACCENT
-        prefix = '说明'
+        prefix = 'Note'
 
     style = styles[box_type] if box_type in styles else styles['tip']
     content = Paragraph(f'<b>{prefix}:</b> {text}', style)
@@ -262,7 +262,7 @@ def make_tip_box(text, styles, box_type='tip'):
 
 
 def make_step(number, title, description, styles):
-    """创建步骤块"""
+    """Create a step block."""
     num_style = ParagraphStyle(
         f'StepNum{number}',
         fontName='PingFangBold',
@@ -308,20 +308,20 @@ def make_step(number, title, description, styles):
     return t
 
 
-# ============ 页面模板 ============
+# ============ Page template ============
 def on_page(canvas, doc):
-    """页眉页脚"""
+    """Header and footer."""
     canvas.saveState()
-    # 页脚
+    # Footer
     canvas.setFont('PingFang', 8)
     canvas.setFillColor(TEXT_GRAY)
     canvas.drawCentredString(A4[0] / 2, 12 * mm, f'- {doc.page} -')
-    canvas.drawString(15 * mm, 12 * mm, '法律文档脱敏工具 by 黄灵宝同学')
+    canvas.drawString(15 * mm, 12 * mm, 'Legal Anonymizer by Lingbao Huang')
     canvas.restoreState()
 
 
 def on_first_page(canvas, doc):
-    """首页无页眉"""
+    """No header on the first page."""
     canvas.saveState()
     canvas.setFont('PingFang', 8)
     canvas.setFillColor(TEXT_GRAY)
@@ -329,86 +329,87 @@ def on_first_page(canvas, doc):
     canvas.restoreState()
 
 
-# ============ 内容构建 ============
+# ============ Content builder ============
 def build_content(styles):
-    """构建PDF内容"""
+    """Build the PDF content."""
     story = []
 
-    # ===== 封面 =====
+    # ===== Cover =====
     story.append(Spacer(1, 40 * mm))
-    story.append(Paragraph('法律文档脱敏工具', styles['title']))
-    story.append(Paragraph('首次使用指南', ParagraphStyle(
+    story.append(Paragraph('Legal Anonymizer', styles['title']))
+    story.append(Paragraph('Getting Started Guide', ParagraphStyle(
         'SubTitle2', fontName='PingFangBold', fontSize=18,
         textColor=ACCENT, alignment=TA_CENTER, spaceAfter=8 * mm, leading=24,
     )))
     story.append(HRFlowable(width='60%', thickness=1, color=ACCENT,
                             spaceAfter=8 * mm, spaceBefore=3 * mm))
     story.append(Paragraph(
-        '完全本地运行 | 不联网不上传 | 支持 30+ 种敏感信息自动识别',
+        'Runs fully on your machine | No network, no uploads | Auto-detects 30+ types of sensitive data',
         styles['subtitle']
     ))
     story.append(Spacer(1, 15 * mm))
     story.append(Paragraph(
-        '适用于 macOS / Windows / Linux',
+        'For macOS / Windows / Linux',
         ParagraphStyle('Platform', fontName='PingFang', fontSize=11,
                        textColor=TEXT_GRAY, alignment=TA_CENTER, leading=16)
     ))
     story.append(Spacer(1, 8 * mm))
     story.append(Paragraph(
-        'by <b>黄灵宝同学</b>',
+        'by <b>Lingbao Huang</b>',
         ParagraphStyle('Author', fontName='PingFang', fontSize=12,
                        textColor=ACCENT, alignment=TA_CENTER, leading=16)
     ))
 
     story.append(PageBreak())
 
-    # ===== 目录 =====
-    story.append(Paragraph('目录', styles['h1']))
+    # ===== Table of contents =====
+    story.append(Paragraph('Contents', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
     toc_items = [
-        '一、产品简介',
-        '二、安装准备',
-        '三、快速启动（推荐）',
-        '四、首次启动选项：是否处理英文文书',
-        '五、手动安装（备选）',
-        '六、使用方法 - 网页界面',
-        '七、检测层级介绍：规则 + 中文 NER + 英文 LLM',
-        '八、OCR 引擎：RapidOCR / PaddleOCR',
-        '九、输出格式：MD / DOCX / PDF',
-        '十、使用方法 - 命令行',
-        '十一、支持的敏感信息类型',
-        '十二、常见问题解答',
-        '十三、隐私安全说明',
+        '1. Product overview',
+        '2. Before you install',
+        '3. Quick start (recommended)',
+        '4. First-launch option: do you handle English documents?',
+        '5. Manual install (alternative)',
+        '6. How to use - browser interface',
+        '7. Detection layers: rules + Chinese NER + English LLM',
+        '8. OCR engines: RapidOCR / PaddleOCR',
+        '9. Output formats: MD / DOCX / PDF',
+        '10. How to use - command line',
+        '11. Supported types of sensitive data',
+        '12. Frequently asked questions',
+        '13. Privacy and security',
     ]
     for item in toc_items:
         story.append(Paragraph(item, styles['toc']))
     story.append(PageBreak())
 
-    # ===== 一、产品简介 =====
-    story.append(Paragraph('一、产品简介', styles['h1']))
+    # ===== 1. Product overview =====
+    story.append(Paragraph('1. Product overview', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '法律文档脱敏工具是一款<b>完全本地运行</b>的敏感信息脱敏软件，'
-        '专为法律工作者设计。它能自动识别并替换文档中的个人信息、公司名称、'
-        '案号、金额、地址等 30 余种敏感数据，确保文件在分享、归档或公开时不泄露隐私。',
+        'Legal Anonymizer is a redaction tool that <b>runs entirely on your machine</b>, '
+        'built for legal professionals. It automatically detects and replaces more than 30 types of '
+        'sensitive data in a document, including personal information, company names, '
+        'case numbers, amounts, and addresses. This keeps private data out of files you share, archive, or publish.',
         styles['body']
     ))
 
-    story.append(Paragraph('核心特点', styles['h3']))
+    story.append(Paragraph('Key features', styles['h3']))
 
     features = [
-        ['完全离线', '所有处理在本地完成，不调用任何外部 API，不上传任何数据'],
-        ['多格式输入', '支持 PDF（含扫描版 OCR）、Word（DOCX/DOC）、TXT、Markdown、图片'],
-        ['多格式输出', '一次脱敏同时生成 MD / DOCX / PDF 三份文件，按需选择'],
-        ['原格式保留', 'DOCX→DOCX 完整保留字体/字号/页眉页脚；PDF→PDF 原地脱敏保留布局/盖章'],
-        ['三层检测', '正则规则 + 中文 NER（CLUENER）+ 英文 LLM（OpenAI privacy-filter，可选）'],
-        ['智能识别', '自动检测 30+ 种敏感信息：人名（含复姓）、公司、身份证、手机、银行卡、案号、地址等'],
-        ['双 OCR 引擎', '默认 RapidOCR（快、轻量）；复杂排版可切 PaddleOCR（准、慢）'],
-        ['灵活策略', '占位符替换（[PERSON_1]）/ 部分掩码（138****5678）两种模式'],
-        ['冲突仲裁', '规则与 LLM 结果重叠时按 5 条规则智能仲裁，互相纠错'],
-        ['同名扩展', '同一姓名在文档中所有出现位置自动一致脱敏'],
-        ['自定义词典', '可手动添加/排除敏感词，适配特定文档需求'],
+        ['Fully offline', 'All processing happens locally. No external API calls, no data uploads.'],
+        ['Many input formats', 'Supports PDF (including scanned PDFs via OCR), Word (DOCX/DOC), TXT, Markdown, and images.'],
+        ['Many output formats', 'One redaction run produces MD, DOCX, and PDF together. Pick whichever you need.'],
+        ['Original layout kept', 'DOCX to DOCX keeps fonts, sizes, headers and footers. PDF to PDF redacts in place and keeps the layout and seals.'],
+        ['Three detection layers', 'Regex rules + Chinese NER (CLUENER) + English LLM (OpenAI privacy-filter, optional).'],
+        ['Smart detection', 'Auto-detects 30+ types of sensitive data: person names (including compound surnames), companies, ID numbers, mobile numbers, bank cards, case numbers, addresses, and more.'],
+        ['Two OCR engines', 'RapidOCR by default (fast, lightweight). Switch to PaddleOCR for complex layouts (accurate, slower).'],
+        ['Flexible strategies', 'Two modes: placeholder replacement ([PERSON_1]) or partial mask (138****5678).'],
+        ['Conflict arbitration', 'When rule and LLM results overlap, five arbitration rules resolve them and correct each other.'],
+        ['Same-name expansion', 'The same name is redacted consistently at every occurrence in the document.'],
+        ['Custom dictionary', 'Add or exclude terms by hand to fit a specific document.'],
     ]
 
     for title, desc in features:
@@ -417,21 +418,21 @@ def build_content(styles):
             styles['bullet']
         ))
 
-    # ===== 二、安装准备 =====
-    story.append(Paragraph('二、安装准备', styles['h1']))
+    # ===== 2. Before you install =====
+    story.append(Paragraph('2. Before you install', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
-    story.append(Paragraph('系统要求', styles['h3']))
+    story.append(Paragraph('System requirements', styles['h3']))
 
     req_data = [
-        ['项目', '要求'],
-        ['操作系统', 'macOS 10.15+ / Windows 10+ / Linux'],
-        ['Python', 'Python 3.9 或以上版本（推荐 3.11）'],
-        ['磁盘空间', '基础约 1.5GB（含 PyTorch + venv）；'
-                     '加中文 NER 模型 +400MB；加英文模型 +2.6GB'],
-        ['内存', '建议 8GB 以上（加载 LLM 模型时占用约 3-4GB）'],
-        ['浏览器', 'Chrome / Edge / Safari / Firefox（任选）'],
-        ['网络', '首次启动需联网下载依赖和模型，之后完全离线运行'],
+        ['Item', 'Requirement'],
+        ['Operating system', 'macOS 10.15+ / Windows 10+ / Linux'],
+        ['Python', 'Python 3.9 or later (3.11 recommended)'],
+        ['Disk space', 'About 1.5 GB base (PyTorch + venv); '
+                     '+400 MB for the Chinese NER model; +2.6 GB for the English model'],
+        ['Memory', '8 GB or more recommended (about 3-4 GB while an LLM model is loaded)'],
+        ['Browser', 'Chrome / Edge / Safari / Firefox (any)'],
+        ['Network', 'The first launch needs internet to download dependencies and models. After that it runs fully offline.'],
     ]
     req_table = Table(req_data, colWidths=[35 * mm, 120 * mm])
     req_table.setStyle(TableStyle([
@@ -451,191 +452,191 @@ def build_content(styles):
     story.append(req_table)
 
     story.append(Spacer(1, 5 * mm))
-    story.append(Paragraph('检查 Python 是否已安装', styles['h3']))
+    story.append(Paragraph('Check whether Python is installed', styles['h3']))
     story.append(Paragraph(
-        '<b>macOS:</b> 按 Command + 空格，搜索"终端"，打开后输入：',
+        '<b>macOS:</b> press Command + Space, search for "Terminal", open it, and type:',
         styles['body']
     ))
     story.append(Paragraph('python3 --version', styles['code']))
     story.append(Paragraph(
-        '<b>Windows:</b> 按 Win + R，输入 cmd 回车，然后输入：',
+        '<b>Windows:</b> press Win + R, type cmd and press Enter, then type:',
         styles['body']
     ))
     story.append(Paragraph('python --version', styles['code']))
     story.append(Paragraph(
-        '如果显示 Python 3.x.x（如 Python 3.11.3），说明已安装。'
-        '如果提示"未找到命令"，请从 python.org 下载安装。',
+        'If it shows Python 3.x.x (for example Python 3.11.3), Python is installed. '
+        'If it says "command not found", download and install it from python.org.',
         styles['body']
     ))
     story.append(make_tip_box(
-        'Windows 安装 Python 时<b>务必勾选</b> "Add Python to PATH"（安装界面最下方的复选框），'
-        '否则在命令行中无法使用 python 命令。',
+        'When installing Python on Windows, <b>be sure to check</b> "Add Python to PATH" '
+        '(the checkbox at the bottom of the installer). Otherwise the python command will not work in the command line.',
         styles, 'warning'
     ))
 
-    # ===== 三、快速启动 =====
+    # ===== 3. Quick start =====
     story.append(PageBreak())
-    story.append(Paragraph('三、快速启动（推荐）', styles['h1']))
+    story.append(Paragraph('3. Quick start (recommended)', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '这是最简单的启动方式，仅需两步：解压 + 双击。',
+        'This is the simplest way to launch. Two steps: unzip, then double-click.',
         styles['body']
     ))
 
-    story.append(Paragraph('macOS 用户', styles['h2']))
+    story.append(Paragraph('macOS users', styles['h2']))
 
-    story.append(make_step(1, '解压文件',
-        '将下载的 legal-anonymizer.zip 解压到任意位置（如桌面）',
+    story.append(make_step(1, 'Unzip the file',
+        'Unzip the downloaded legal-anonymizer.zip anywhere you like (for example, the Desktop).',
         styles))
     story.append(Spacer(1, 3 * mm))
-    story.append(make_step(2, '双击启动',
-        '双击文件夹中的<b>【请双击我！】启动脱敏工具.command</b>。'
-        '首次运行会自动安装依赖，完成后会自动打开浏览器。',
+    story.append(make_step(2, 'Double-click to launch',
+        'Double-click <b>[Double-click me!] Start Legal Anonymizer.command</b> in the folder. '
+        'The first run installs dependencies automatically, then opens your browser.',
         styles))
 
     story.append(Spacer(1, 5 * mm))
     story.append(make_tip_box(
-        '首次打开可能弹出 macOS 安全提示"无法验证开发者"。'
-        '请打开<b>系统设置 > 隐私与安全性</b>，向下滚动找到被阻止的提示，'
-        '点击<b>"仍要打开"</b>，输入密码确认即可。之后再次双击就不会再弹提示。',
+        'The first time, macOS may show a security prompt saying the developer cannot be verified. '
+        'Open <b>System Settings > Privacy & Security</b>, scroll down to the blocked item, '
+        'click <b>"Open Anyway"</b>, and confirm with your password. After that, double-clicking will not prompt again.',
         styles, 'warning'
     ))
 
     story.append(Spacer(1, 5 * mm))
-    story.append(Paragraph('Windows 用户', styles['h2']))
+    story.append(Paragraph('Windows users', styles['h2']))
 
-    story.append(make_step(1, '解压文件',
-        '右键 legal-anonymizer.zip，选择"全部解压缩"',
+    story.append(make_step(1, 'Unzip the file',
+        'Right-click legal-anonymizer.zip and choose "Extract All".',
         styles))
     story.append(Spacer(1, 3 * mm))
-    story.append(make_step(2, '双击启动',
-        '双击文件夹中的<b>启动脱敏工具.bat</b>',
+    story.append(make_step(2, 'Double-click to launch',
+        'Double-click <b>Start Legal Anonymizer.bat</b> in the folder.',
         styles))
 
-    # ===== 四、首次启动选项 =====
+    # ===== 4. First-launch option =====
     story.append(PageBreak())
-    story.append(Paragraph('四、首次启动选项：是否处理英文文书', styles['h1']))
+    story.append(Paragraph('4. First-launch option: do you handle English documents?', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '首次双击启动脚本时，工具会询问您一个问题：',
+        'The first time you double-click the launch script, the tool asks you one question:',
         styles['body']
     ))
     story.append(make_tip_box(
-        '<b>"您是否经常处理英文/涉外法律文书？(y / n)"</b>',
+        '<b>"Do you often handle English or cross-border legal documents? (y / n)"</b>',
         styles, 'info'
     ))
     story.append(Paragraph(
-        '这是为了决定是否启用英文识别能力（基于 OpenAI privacy-filter 模型）。'
-        '工具默认能识别中文文档里的所有敏感信息，'
-        '英文识别只对涉外律师有用。',
+        'This decides whether to enable English detection (based on the OpenAI privacy-filter model). '
+        'By default the tool detects all sensitive data in Chinese documents. '
+        'English detection is only useful for lawyers handling cross-border matters.',
         styles['body']
     ))
 
-    story.append(Paragraph('选择 "y"（是）—— 启用英文识别', styles['h3']))
+    story.append(Paragraph('Choose "y" (yes) - enable English detection', styles['h3']))
     en_yes = [
-        '能识别英文人名（如 John Smith）、英文地址、国际电话、API 密钥',
-        '首次勾选 OpenAI 开关时会下载约 <b>2.6 GB</b> 模型（一次性）',
-        '适合涉外仲裁、跨境合同、外资企业法律事务',
+        'Detects English person names (for example, John Smith), English addresses, international phone numbers, and API keys.',
+        'Turning on the OpenAI switch for the first time downloads about <b>2.6 GB</b> of model (one time).',
+        'Good for cross-border arbitration, cross-border contracts, and foreign-invested company matters.',
     ]
     for p in en_yes:
         story.append(Paragraph(f'<bullet>&bull;</bullet> {p}', styles['bullet']))
 
-    story.append(Paragraph('选择 "n"（否）—— 仅中文模式', styles['h3']))
+    story.append(Paragraph('Choose "n" (no) - Chinese-only mode', styles['h3']))
     en_no = [
-        '只识别中文 PII，但中文文档准确率已接近 100%',
-        '<b>节省 2.6 GB 磁盘空间和首次下载时间</b>',
-        '适合绝大多数中国律师场景（合同/判决书/答辩状均纯中文）',
-        '网页界面将不显示 OpenAI 开关',
+        'Detects Chinese PII only, but accuracy on Chinese documents is already near 100%.',
+        '<b>Saves 2.6 GB of disk space and the first-time download.</b>',
+        'Fits the vast majority of Chinese legal work (contracts, judgments, and pleadings are all in Chinese).',
+        'The browser interface will not show the OpenAI switch.',
     ]
     for p in en_no:
         story.append(Paragraph(f'<bullet>&bull;</bullet> {p}', styles['bullet']))
 
     story.append(make_tip_box(
-        '<b>选错了想反悔？</b>删除项目根目录下的 <code>.user_config</code> 文件，'
-        '重新双击启动脚本即可重新选择。',
+        '<b>Chose wrong and want to switch?</b> Delete the <code>.user_config</code> file in the project root, '
+        'then double-click the launch script again to choose once more.',
         styles, 'tip'
     ))
 
-    # ===== 五、手动安装 =====
+    # ===== 5. Manual install =====
     story.append(PageBreak())
-    story.append(Paragraph('五、手动安装（备选）', styles['h1']))
+    story.append(Paragraph('5. Manual install (alternative)', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '如果快速启动不生效，可以手动安装。',
+        'If the quick start does not work, you can install manually.',
         styles['body']
     ))
 
-    story.append(make_step(1, '打开终端/命令行',
-        '<b>macOS:</b> Command + 空格 > 搜索"终端"<br/>'
-        '<b>Windows:</b> Win + R > 输入 cmd > 回车',
+    story.append(make_step(1, 'Open Terminal / Command Prompt',
+        '<b>macOS:</b> Command + Space > search for "Terminal"<br/>'
+        '<b>Windows:</b> Win + R > type cmd > Enter',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(2, '进入项目文件夹',
-        '在终端输入 cd ，然后将文件夹从访达/资源管理器拖到终端窗口，按回车。<br/>'
-        '或直接输入路径，例如：cd ~/Desktop/legal-anonymizer',
+    story.append(make_step(2, 'Go to the project folder',
+        'Type cd in the terminal, then drag the folder from Finder / File Explorer into the terminal window and press Enter.<br/>'
+        'Or type the path directly, for example: cd ~/Desktop/legal-anonymizer',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(3, '安装依赖（仅首次）',
+    story.append(make_step(3, 'Install dependencies (first time only)',
         '<b>macOS:</b> pip3 install -r requirements.txt<br/>'
         '<b>Windows:</b> pip install -r requirements.txt<br/>'
-        '等待安装完成，无红色报错即可。',
+        'Wait for it to finish. No red errors means success.',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(4, '启动工具',
+    story.append(make_step(4, 'Start the tool',
         '<b>macOS:</b> python3 web_app.py<br/>'
         '<b>Windows:</b> python web_app.py<br/>'
-        '启动后会自动打开浏览器。如未自动打开，手动访问终端显示的地址（通常是 http://127.0.0.1:8080）',
+        'It opens your browser automatically. If it does not, open the address shown in the terminal (usually http://127.0.0.1:8080).',
         styles))
 
     story.append(Spacer(1, 5 * mm))
     story.append(make_tip_box(
-        '不要关闭终端窗口！关闭终端 = 停止服务。使用完毕后再关闭。',
+        'Do not close the terminal window. Closing the terminal stops the service. Close it only when you are done.',
         styles, 'danger'
     ))
 
-    # ===== 六、使用方法 - 网页界面 =====
+    # ===== 6. How to use - browser interface =====
     story.append(PageBreak())
-    story.append(Paragraph('六、使用方法 - 网页界面', styles['h1']))
+    story.append(Paragraph('6. How to use - browser interface', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
-    story.append(Paragraph('基本流程', styles['h2']))
+    story.append(Paragraph('Basic workflow', styles['h2']))
 
-    story.append(make_step(1, '上传文件',
-        '将文件拖拽到网页上传区域，或点击选择文件。支持 PDF、DOCX、TXT 格式。<br/>'
-        '也可以将文件放入项目文件夹下的 inbox 目录，在页面中直接选择。',
+    story.append(make_step(1, 'Upload a file',
+        'Drag a file onto the upload area, or click to select one. Supports PDF, DOCX, and TXT.<br/>'
+        'You can also drop files into the inbox folder under the project directory and pick them on the page.',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(2, '自动分析',
-        '上传后工具会自动扫描文档，列出所有识别到的敏感信息。'
-        '每项旁边有复选框，可以取消勾选不需要脱敏的项目。',
+    story.append(make_step(2, 'Automatic analysis',
+        'After upload, the tool scans the document and lists every piece of sensitive data it finds. '
+        'Each item has a checkbox, so you can uncheck anything you do not want redacted.',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(3, '手动补充（可选）',
-        '如果发现有遗漏的敏感信息，可以手动添加到自定义词典。'
-        '词典会持久保存，下次使用时自动生效。',
+    story.append(make_step(3, 'Add items by hand (optional)',
+        'If you spot anything that was missed, add it to the custom dictionary by hand. '
+        'The dictionary is saved and applies automatically next time.',
         styles))
     story.append(Spacer(1, 3 * mm))
 
-    story.append(make_step(4, '执行脱敏',
-        '点击"执行脱敏"按钮，等待处理完成后下载脱敏结果文件。<br/>'
-        '同时会生成映射表（JSON），记录每个占位符对应的原始内容。',
+    story.append(make_step(4, 'Run redaction',
+        'Click "Run redaction", wait for it to finish, then download the redacted file.<br/>'
+        'A mapping table (JSON) is also created, recording the original content behind each placeholder.',
         styles))
 
     story.append(Spacer(1, 5 * mm))
-    story.append(Paragraph('脱敏策略说明', styles['h2']))
+    story.append(Paragraph('Redaction strategies', styles['h2']))
 
     strategy_data = [
-        ['策略', '效果示例', '适用场景'],
-        ['占位符替换', '张三 > [PERSON_1]', '完全隐藏原始信息，适合公开发布'],
-        ['部分掩码', '138****5678', '保留部分信息便于核对，适合内部使用'],
+        ['Strategy', 'Example', 'When to use'],
+        ['Placeholder replacement', 'Zhang San > [PERSON_1]', 'Hides the original entirely. Good for public release.'],
+        ['Partial mask', '138****5678', 'Keeps part of the value for cross-checking. Good for internal use.'],
     ]
     strategy_table = Table(strategy_data, colWidths=[30 * mm, 60 * mm, 65 * mm])
     strategy_table.setStyle(TableStyle([
@@ -654,30 +655,30 @@ def build_content(styles):
     story.append(strategy_table)
 
     story.append(Spacer(1, 5 * mm))
-    story.append(Paragraph('继续脱敏功能', styles['h2']))
+    story.append(Paragraph('Continue redaction', styles['h2']))
     story.append(Paragraph(
-        '第一次脱敏后，如果发现仍有遗漏的敏感信息，可以使用"继续脱敏"功能：'
-        '手动添加遗漏的词条，工具会基于原始文本重新处理，'
-        '新添加的词条也会自动存入词典供后续使用。',
+        'After the first pass, if some sensitive data is still missing, use "Continue redaction": '
+        'add the missed terms by hand and the tool reprocesses from the original text. '
+        'The newly added terms are also saved to the dictionary for later use.',
         styles['body']
     ))
 
-    # ===== 七、检测层级介绍 =====
+    # ===== 7. Detection layers =====
     story.append(PageBreak())
-    story.append(Paragraph('七、检测层级介绍：规则 + 中文 NER + 英文 LLM', styles['h1']))
+    story.append(Paragraph('7. Detection layers: rules + Chinese NER + English LLM', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '本工具采用<b>三层检测架构</b>，每层负责不同类型的敏感信息，'
-        '协同工作互相纠错。这是它准确率高的核心原因。',
+        'The tool uses a <b>three-layer detection architecture</b>. Each layer handles a different kind of '
+        'sensitive data, and the layers work together and correct each other. This is the main reason for its high accuracy.',
         styles['body']
     ))
 
     layer_data = [
-        ['层级', '负责检测', '速度'],
-        ['正则规则', '身份证、手机、邮箱、案号、信用代码等 30+ 结构化数据', '极快（毫秒级）'],
-        ['中文 NER（CLUENER）', '中文人名（含复姓）、公司名、律所、地址、机构', '快（秒级）'],
-        ['英文 LLM（OpenAI，可选）', '英文人名、英文地址、国际电话、API 密钥', '稍慢（数秒）'],
+        ['Layer', 'What it detects', 'Speed'],
+        ['Regex rules', 'ID numbers, mobile numbers, email, case numbers, credit codes, and 30+ other structured data', 'Very fast (milliseconds)'],
+        ['Chinese NER (CLUENER)', 'Chinese person names (including compound surnames), company names, law firms, addresses, institutions', 'Fast (seconds)'],
+        ['English LLM (OpenAI, optional)', 'English person names, English addresses, international phone numbers, API keys', 'Slower (a few seconds)'],
     ]
     layer_table = Table(layer_data, colWidths=[40 * mm, 90 * mm, 25 * mm])
     layer_table.setStyle(TableStyle([
@@ -695,34 +696,34 @@ def build_content(styles):
     story.append(layer_table)
 
     story.append(Spacer(1, 5 * mm))
-    story.append(Paragraph('网页界面的检测层开关', styles['h3']))
+    story.append(Paragraph('Detection-layer switches in the browser', styles['h3']))
     story.append(Paragraph(
-        '在网页上传区域下方有两个（或三个）开关：',
+        'Below the upload area there are two (or three) switches:',
         styles['body']
     ))
     switch_points = [
-        '<b>启用 OCR</b>——扫描版 PDF / 图片必开；非扫描 PDF 可选',
-        '<b>中文 NER</b>——所有中文文书<b>都建议开启</b>，能补正则的盲区',
-        '<b>OpenAI privacy-filter</b>——仅在首次启动选择"是"时显示，处理英文文书时勾选',
+        '<b>Enable OCR</b> - required for scanned PDFs and images; optional for non-scanned PDFs.',
+        '<b>Chinese NER</b> - <b>recommended for every Chinese document</b>, since it fills the gaps the rules miss.',
+        '<b>OpenAI privacy-filter</b> - shown only if you chose "yes" at first launch; turn it on when handling English documents.',
     ]
     for p in switch_points:
         story.append(Paragraph(f'<bullet>&bull;</bullet> {p}', styles['bullet']))
 
-    # ===== 八、OCR 引擎 =====
+    # ===== 8. OCR engines =====
     story.append(PageBreak())
-    story.append(Paragraph('八、OCR 引擎：RapidOCR / PaddleOCR', styles['h1']))
+    story.append(Paragraph('8. OCR engines: RapidOCR / PaddleOCR', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '当输入是扫描版 PDF 或图片时，工具会用 OCR 引擎把图像转为文字。'
-        '内置两个引擎：',
+        'When the input is a scanned PDF or an image, the tool uses an OCR engine to turn the image into text. '
+        'Two engines are built in:',
         styles['body']
     ))
 
     ocr_data = [
-        ['引擎', '速度（每页）', '准确度', '体积', '默认'],
-        ['RapidOCR', '约 2 秒', '良好', '15 MB', '✓'],
-        ['PaddleOCR 3.5', '约 30 秒', '稍优（复杂排版）', '约 200 MB', ''],
+        ['Engine', 'Speed (per page)', 'Accuracy', 'Size', 'Default'],
+        ['RapidOCR', 'About 2 sec', 'Good', '15 MB', '✓'],
+        ['PaddleOCR 3.5', 'About 30 sec', 'Slightly better (complex layouts)', 'About 200 MB', ''],
     ]
     ocr_table = Table(ocr_data, colWidths=[35 * mm, 30 * mm, 40 * mm, 25 * mm, 15 * mm])
     ocr_table.setStyle(TableStyle([
@@ -742,28 +743,28 @@ def build_content(styles):
 
     story.append(Spacer(1, 5 * mm))
     story.append(make_tip_box(
-        '<b>什么时候切到 PaddleOCR？</b>'
-        'RapidOCR 默认情况下识别得已经很好。如果你发现某份扫描版 PDF 错字特别多'
-        '（比如盖章、糊字、表格复杂），勾选 OCR 后再勾"PaddleOCR"重新分析一次。',
+        '<b>When should you switch to PaddleOCR?</b> '
+        'RapidOCR already reads most documents well. If a particular scanned PDF has a lot of garbled characters '
+        '(for example, seals, smudged text, or complex tables), enable OCR, then check "PaddleOCR" and re-analyze.',
         styles, 'tip'
     ))
 
-    # ===== 九、输出格式 =====
+    # ===== 9. Output formats =====
     story.append(PageBreak())
-    story.append(Paragraph('九、输出格式：MD / DOCX / PDF', styles['h1']))
+    story.append(Paragraph('9. Output formats: MD / DOCX / PDF', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '工具支持<b>同时输出三种格式</b>。在网页脱敏页面，"输出格式"那里有三个复选框，'
-        '可以全选，也可以只勾你需要的。',
+        'The tool can <b>output all three formats at once</b>. On the redaction page, the "Output format" area has '
+        'three checkboxes. Select all of them, or only the ones you need.',
         styles['body']
     ))
 
     out_data = [
-        ['格式', '保留原格式', '适用场景'],
-        ['MD（Markdown）', '×', '快速预览、复制粘贴、导入笔记软件'],
-        ['DOCX（Word）', '✓ 输入 DOCX 时完整保留字体/字号/排版', '律师工作底稿、案件归档、给客户'],
-        ['PDF', '✓ 输入 PDF 时原地脱敏，保留布局/盖章/签名', '正式文件、法庭证据、对外交付'],
+        ['Format', 'Keeps original layout', 'When to use'],
+        ['MD (Markdown)', '×', 'Quick preview, copy and paste, import into note apps'],
+        ['DOCX (Word)', '✓ Keeps fonts, sizes, and layout when the input is DOCX', 'Lawyer work drafts, case archiving, sending to clients'],
+        ['PDF', '✓ Redacts in place when the input is PDF, keeping layout, seals, and signatures', 'Formal documents, court evidence, external delivery'],
     ]
     out_table = Table(out_data, colWidths=[30 * mm, 65 * mm, 60 * mm])
     out_table.setStyle(TableStyle([
@@ -783,71 +784,71 @@ def build_content(styles):
 
     story.append(Spacer(1, 4 * mm))
     story.append(Paragraph(
-        '<b>原格式保留是什么意思？</b>—— 比如你输入一份 Word 合同（标楷体小四 1.5 倍行距），'
-        '输出的 DOCX 文件还是标楷体小四 1.5 倍行距，只是当事人姓名变成了占位符。'
-        '同理 PDF 输入会得到一份保留所有布局/字体/盖章的脱敏版 PDF。',
+        '<b>What does "keeps original layout" mean?</b> For example, if you input a Word contract '
+        '(KaiTi, size 12, 1.5 line spacing), the output DOCX is still KaiTi, size 12, 1.5 line spacing. '
+        'Only the party names become placeholders. Likewise, a PDF input yields a redacted PDF that keeps all of its layout, fonts, and seals.',
         styles['body']
     ))
 
     story.append(make_tip_box(
-        '<b>跨格式输出（如 PDF→DOCX）</b>：会用<b>仿宋小四 1.5 倍行距</b>'
-        '（法律文书标准模板）重新排版。',
+        '<b>Cross-format output (for example, PDF to DOCX):</b> the result is re-laid-out using '
+        '<b>FangSong, size 12, 1.5 line spacing</b> (the standard legal-document template).',
         styles, 'info'
     ))
 
-    # ===== 十、使用方法 - 命令行 =====
+    # ===== 10. How to use - command line =====
     story.append(PageBreak())
-    story.append(Paragraph('十、使用方法 - 命令行', styles['h1']))
+    story.append(Paragraph('10. How to use - command line', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '命令行适合批量处理或集成到工作流中。',
+        'The command line is good for batch processing or integrating into a workflow.',
         styles['body']
     ))
 
     cmd_examples = [
-        ('脱敏 Word 文档（保留原格式）', 'python3 cli.py anonymize input.docx -o output.docx --cn-llm'),
-        ('脱敏 PDF（PDF 原地脱敏）', 'python3 cli.py anonymize input.pdf -o output.pdf --cn-llm'),
-        ('一次输出 MD+DOCX+PDF 三种格式', 'python3 cli.py anonymize input.pdf -o output -f md,docx,pdf --cn-llm'),
-        ('扫描版 PDF（启用 OCR + 中文 NER）', 'python3 cli.py anonymize scan.pdf -o output.docx --ocr --cn-llm'),
-        ('扫描版用 PaddleOCR 引擎', 'python3 cli.py anonymize scan.pdf -o out.docx --ocr --ocr-engine paddleocr'),
-        ('全开模式（中英混合涉外案件）', 'python3 cli.py anonymize input.pdf -o out.pdf --cn-llm --llm'),
-        ('只分析不脱敏', 'python3 cli.py analyze input.docx --cn-llm'),
-        ('查看所有支持的类型', 'python3 cli.py list-types'),
-        ('只脱敏手机号和邮箱', 'python3 cli.py anonymize input.pdf --only phone,email'),
-        ('使用部分掩码策略', 'python3 cli.py anonymize input.pdf --mask-strategy partial'),
+        ('Redact a Word document (keep original layout)', 'python3 cli.py anonymize input.docx -o output.docx --cn-llm'),
+        ('Redact a PDF (in-place PDF redaction)', 'python3 cli.py anonymize input.pdf -o output.pdf --cn-llm'),
+        ('Output MD + DOCX + PDF in one run', 'python3 cli.py anonymize input.pdf -o output -f md,docx,pdf --cn-llm'),
+        ('Scanned PDF (enable OCR + Chinese NER)', 'python3 cli.py anonymize scan.pdf -o output.docx --ocr --cn-llm'),
+        ('Use the PaddleOCR engine for a scan', 'python3 cli.py anonymize scan.pdf -o out.docx --ocr --ocr-engine paddleocr'),
+        ('All layers on (mixed Chinese/English cross-border case)', 'python3 cli.py anonymize input.pdf -o out.pdf --cn-llm --llm'),
+        ('Analyze only, no redaction', 'python3 cli.py analyze input.docx --cn-llm'),
+        ('List all supported types', 'python3 cli.py list-types'),
+        ('Redact mobile numbers and email only', 'python3 cli.py anonymize input.pdf --only phone,email'),
+        ('Use the partial-mask strategy', 'python3 cli.py anonymize input.pdf --mask-strategy partial'),
     ]
 
     for desc, cmd in cmd_examples:
         story.append(Paragraph(f'<b>{desc}:</b>', styles['body']))
         story.append(Paragraph(cmd, styles['code']))
 
-    # ===== 十一、支持的敏感信息类型 =====
+    # ===== 11. Supported types of sensitive data =====
     story.append(PageBreak())
-    story.append(Paragraph('十一、支持的敏感信息类型', styles['h1']))
+    story.append(Paragraph('11. Supported types of sensitive data', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(Paragraph(
-        '工具支持自动识别以下 30+ 种敏感信息：',
+        'The tool auto-detects the following 30+ types of sensitive data:',
         styles['body']
     ))
 
     type_data = [
-        ['类别', '包含类型'],
-        ['身份证件', '身份证号、护照号、港澳通行证、台湾通行证、军官证'],
-        ['企业/机构', '统一社会信用代码、组织机构代码、税务登记号、公司名、律所名'],
-        ['案件/合同', '案号、合同编号、发票号码、文件编号'],
-        ['联系方式', '手机号、座机/传真、400/800 电话、邮箱、网址'],
-        ['社交账号', 'QQ 号、微信号'],
-        ['金融信息', '银行卡号、人民币金额（含中文大写）、外币金额'],
-        ['车辆信息', '车牌号、车辆识别码（VIN）'],
-        ['地址信息', '完整地址、邮政编码、门牌号'],
-        ['人名', '基于上下文关键词自动识别法律文书中的人名'],
-        ['机构名称', '公司、律所、法院、政府机构、银行、学校、医院等'],
-        ['日期时间', '日期、时间、日期时间'],
-        ['网络标识', 'IP 地址、MAC 地址'],
-        ['证书编号', '房地产证号、证书/批文编号、专利/商标编号'],
-        ['项目名称', '项目、工程、系统、平台名称'],
+        ['Category', 'Types covered'],
+        ['ID documents', 'ID number, passport no., HK/Macau permit, Taiwan permit, military ID'],
+        ['Companies / institutions', 'Unified social credit code, org code, tax registration no., company name, law firm name'],
+        ['Cases / contracts', 'Case number, contract no., invoice no., document no.'],
+        ['Contact details', 'Mobile number, landline / fax, 400/800 hotline, email, URL'],
+        ['Social accounts', 'QQ / WeChat ID'],
+        ['Financial', 'Bank card no., RMB amount (including Chinese capital figures), foreign-currency amount'],
+        ['Vehicle', 'License plate, VIN'],
+        ['Address', 'Full address, postal code, house number'],
+        ['Person names', 'Person names in legal documents, detected from surrounding context keywords'],
+        ['Institution names', 'Companies, law firms, courts, government bodies, banks, schools, hospitals, and more'],
+        ['Date and time', 'Date, time, date / time'],
+        ['Network identifiers', 'IP address, MAC address'],
+        ['Certificate numbers', 'Property certificate no., permit / approval no., patent / trademark no.'],
+        ['Project names', 'Project, works, system, and platform names'],
     ]
 
     type_table = Table(type_data, colWidths=[28 * mm, 127 * mm])
@@ -866,44 +867,44 @@ def build_content(styles):
     ]))
     story.append(type_table)
 
-    # ===== 十二、常见问题解答 =====
+    # ===== 12. Frequently asked questions =====
     story.append(PageBreak())
-    story.append(Paragraph('十二、常见问题解答', styles['h1']))
+    story.append(Paragraph('12. Frequently asked questions', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     faqs = [
-        ('pip install 报错 Permission denied',
-         '在命令前加 --user：pip3 install --user -r requirements.txt'),
-        ('启动后浏览器没有自动打开',
-         '手动打开浏览器，输入终端中显示的地址（通常是 http://127.0.0.1:8080）。'),
-        ('启动报错 Address already in use',
-         '端口被占用，程序会自动尝试 8080-8099 端口。如果都被占用，关掉其他程序后重试。'),
-        ('Windows 上 python 命令打开 Microsoft Store',
-         '在系统设置中关闭"应用执行别名"中的 Python 项，或使用完整路径运行。'),
-        ('macOS 提示 command not found: python3',
-         '需要安装 Python。或尝试安装 Xcode 命令行工具：xcode-select --install'),
-        ('报错 ModuleNotFoundError',
-         '依赖未安装成功，重新执行 pip 安装命令。确保 pip 和 python 版本一致：python3 -m pip install -r requirements.txt'),
-        ('我之前选了不安装英文模型，现在想用了怎么办',
-         '删除项目根目录下的 .user_config 文件，重新双击启动脚本，会再次询问。选择"y"即启用英文识别。'),
-        ('国内下载模型很慢',
-         '启动脚本默认走 hf-mirror.com 国内镜像。如果还慢，可以手动设置环境变量：export HF_ENDPOINT=https://hf-mirror.com'),
-        ('勾选"中文 NER"后第一次分析等了很久',
-         '正常现象。首次启用会从 HuggingFace 下载约 400MB 模型，国内 1-3 分钟。下完后所有后续操作都是秒级。'),
-        ('网页里没有 OpenAI 开关',
-         '说明你首次启动时选择了"仅中文模式"。删除 .user_config 重启即可重新选择。'),
-        ('DOCX 输出格式和原文不一样',
-         '当输入是 DOCX 且输出也是 DOCX 时，工具会自动保留原始格式。如果输入是 PDF，输出的 DOCX 用仿宋小四 1.5 倍行距标准模板。'),
-        ('PDF 输出和原 PDF 长得不一样',
-         '当输入是 PDF 且输出也是 PDF 时，会做"原地脱敏"——保留原 PDF 的字体、布局、盖章、签名，只把敏感字替换为占位符。'),
-        ('OCR 识别错字多',
-         '默认 RapidOCR 已经够用。复杂排版可在勾选"启用 OCR"后切到"PaddleOCR"引擎重新分析（更慢但稍准）。'),
-        ('扫描版 PDF 识别不了文字',
-         '勾选"启用 OCR"开关。RapidOCR 引擎已内置，无需额外安装。首次使用会自动下载约 15MB 模型。'),
-        ('某些敏感信息没有被识别到',
-         '一是开启"中文 NER"层（强烈建议）；二是用网页"用户词典"功能手动添加，词典会持久保存。'),
-        ('脱敏后想反向查回原文',
-         '每次脱敏会生成一份 _mapping.json 映射表，包含占位符与原文的对应关系。请像对待原文件一样妥善保管。'),
+        ('pip install fails with Permission denied',
+         'Add --user before the command: pip3 install --user -r requirements.txt'),
+        ('The browser did not open after launch',
+         'Open your browser by hand and enter the address shown in the terminal (usually http://127.0.0.1:8080).'),
+        ('Launch fails with Address already in use',
+         'The port is taken. The program automatically tries ports 8080-8099. If all are taken, close other programs and retry.'),
+        ('On Windows, the python command opens the Microsoft Store',
+         'In System Settings, turn off the Python entries under "App execution aliases", or run with the full path.'),
+        ('macOS says command not found: python3',
+         'You need to install Python. Or try installing the Xcode command line tools: xcode-select --install'),
+        ('Error: ModuleNotFoundError',
+         'Dependencies did not install correctly. Run the pip install command again. Make sure pip and python match: python3 -m pip install -r requirements.txt'),
+        ('I chose not to install the English model earlier and now want to use it',
+         'Delete the .user_config file in the project root and double-click the launch script again. It will ask once more. Choose "y" to enable English detection.'),
+        ('Model downloads are slow in mainland China',
+         'The launch script uses the hf-mirror.com mirror by default. If it is still slow, set the environment variable by hand: export HF_ENDPOINT=https://hf-mirror.com'),
+        ('After checking "Chinese NER", the first analysis took a long time',
+         'This is normal. The first time it runs, it downloads about a 400 MB model from HuggingFace (1-3 minutes in China). After that, every later run takes only seconds.'),
+        ('There is no OpenAI switch in the browser',
+         'That means you chose "Chinese-only mode" at first launch. Delete .user_config and restart to choose again.'),
+        ('The DOCX output does not match the original layout',
+         'When the input is DOCX and the output is also DOCX, the tool keeps the original layout automatically. If the input is PDF, the output DOCX uses the FangSong, size 12, 1.5 line spacing standard template.'),
+        ('The PDF output looks different from the original PDF',
+         'When the input is PDF and the output is also PDF, it does "in-place redaction": it keeps the original PDF fonts, layout, seals, and signatures, and only replaces sensitive text with placeholders.'),
+        ('OCR produces many garbled characters',
+         'The default RapidOCR is good enough for most cases. For complex layouts, enable OCR, switch to the "PaddleOCR" engine, and re-analyze (slower but slightly more accurate).'),
+        ('A scanned PDF does not read any text',
+         'Turn on the "Enable OCR" switch. The RapidOCR engine is built in, no extra install needed. The first run downloads about a 15 MB model automatically.'),
+        ('Some sensitive data was not detected',
+         'First, turn on the "Chinese NER" layer (strongly recommended). Second, add it by hand using the browser "User dictionary" feature. The dictionary is saved.'),
+        ('I want to look the original text back up after redaction',
+         'Each redaction run produces a _mapping.json table linking placeholders to the original text. Keep it as carefully as the original file.'),
     ]
 
     for q, a in faqs:
@@ -911,29 +912,29 @@ def build_content(styles):
         story.append(Paragraph(f'A: {a}', styles['body_indent']))
         story.append(Spacer(1, 2 * mm))
 
-    # ===== 十三、隐私安全说明 =====
-    story.append(Paragraph('十三、隐私安全说明', styles['h1']))
+    # ===== 13. Privacy and security =====
+    story.append(Paragraph('13. Privacy and security', styles['h1']))
     story.append(HRFlowable(width='100%', thickness=0.5, color=BORDER, spaceAfter=5 * mm))
 
     story.append(make_tip_box(
-        '本工具所有处理<b>完全在本地</b>进行，<b>不调用任何外部 API</b>，<b>不上传任何数据</b>到云端。'
-        '代码完全开源可审计，适合处理高度机密的法律文件。',
+        'All processing runs <b>entirely on your machine</b>. It <b>calls no external API</b> and '
+        '<b>uploads no data</b> to the cloud. The code is fully open source and auditable, so it suits highly confidential legal files.',
         styles, 'tip'
     ))
 
     story.append(Spacer(1, 5 * mm))
 
     security_points = [
-        '所有文本分析和替换在内存中完成，不经过网络传输',
-        '所有 AI 模型（中文 NER / OpenAI / RapidOCR / PaddleOCR）首次下载后完全离线运行，'
-        '不需要联网',
-        '上传的文件会在处理完成后自动清理（网页模式下 24 小时后删除）',
-        '生成的映射表（_mapping.json）包含原始敏感信息与占位符的对应关系，请妥善保管',
-        '建议在处理完成后删除映射文件，或将其存放在安全的位置',
-        '工具源码完全开源可审计，可执行 grep -r "requests|urllib|http" *.py 验证'
-        '项目代码本身零网络调用',
-        '可设置三个环境变量进一步彻底断网：HF_HUB_OFFLINE=1、TRANSFORMERS_OFFLINE=1、'
-        'PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=1',
+        'All text analysis and replacement happen in memory. Nothing is sent over the network.',
+        'All AI models (Chinese NER / OpenAI / RapidOCR / PaddleOCR) run fully offline after the first download. '
+        'No internet needed.',
+        'Uploaded files are cleaned up automatically once processing finishes (deleted after 24 hours in browser mode).',
+        'The generated mapping table (_mapping.json) links the original sensitive data to the placeholders. Keep it safe.',
+        'We recommend deleting the mapping file after you are done, or storing it in a secure location.',
+        'The source code is fully open source and auditable. Run grep -r "requests|urllib|http" *.py to verify '
+        'the project code itself makes zero network calls.',
+        'You can set three environment variables to cut off the network completely: HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1, '
+        'PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=1.',
     ]
     for point in security_points:
         story.append(Paragraph(
@@ -943,8 +944,8 @@ def build_content(styles):
 
     story.append(Spacer(1, 10 * mm))
     story.append(make_tip_box(
-        '<b>映射表安全提示：</b>脱敏后生成的 _mapping.json 文件包含所有原始敏感信息的对应关系。'
-        '请像对待原文件一样妥善保管此文件，不要随脱敏版文件一起分享。',
+        '<b>Mapping-table security note:</b> the _mapping.json file generated after redaction contains the full mapping of '
+        'the original sensitive data. Keep it as carefully as the original file, and do not share it alongside the redacted file.',
         styles, 'danger'
     ))
 
@@ -952,13 +953,13 @@ def build_content(styles):
     story.append(HRFlowable(width='40%', thickness=0.5, color=BORDER,
                             spaceAfter=5 * mm, spaceBefore=5 * mm))
     story.append(Paragraph(
-        '如有问题或建议，欢迎反馈。祝使用愉快！',
+        'Questions or suggestions are welcome. Enjoy using it!',
         ParagraphStyle('EndNote', fontName='PingFang', fontSize=11,
                        textColor=TEXT_GRAY, alignment=TA_CENTER, leading=16)
     ))
     story.append(Spacer(1, 5 * mm))
     story.append(Paragraph(
-        'Made with love by <b>黄灵宝同学</b>',
+        'Made with love by <b>Lingbao Huang</b>',
         ParagraphStyle('Brand', fontName='PingFang', fontSize=10,
                        textColor=ACCENT, alignment=TA_CENTER, leading=14)
     ))
@@ -966,9 +967,9 @@ def build_content(styles):
     return story
 
 
-# ============ 主入口 ============
+# ============ Main entry point ============
 def main():
-    output_path = Path(__file__).parent / '首次使用指南.pdf'
+    output_path = Path(__file__).parent / 'Getting Started Guide.pdf'
 
     doc = SimpleDocTemplate(
         str(output_path),
@@ -977,7 +978,7 @@ def main():
         bottomMargin=20 * mm,
         leftMargin=20 * mm,
         rightMargin=20 * mm,
-        title='法律文档脱敏工具 - 首次使用指南',
+        title='Legal Anonymizer - Getting Started Guide',
         author='Legal Anonymizer',
     )
 
@@ -985,7 +986,7 @@ def main():
     story = build_content(styles)
 
     doc.build(story, onFirstPage=on_first_page, onLaterPages=on_page)
-    print(f'PDF 生成成功: {output_path}')
+    print(f'PDF generated successfully: {output_path}')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 """
 File Processors
-文件处理器模块
+Module: file processors
 """
 from .file_processor import FileProcessor
 

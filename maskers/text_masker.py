@@ -1,6 +1,5 @@
 """
-Text Masker - Smart data masking with various strategies
-文本掩码器 - 支持多种脱敏策略的智能数据掩码
+Text Masker - smart data masking that supports several redaction strategies.
 """
 
 from typing import Dict, List, Tuple
@@ -8,10 +7,10 @@ from collections import defaultdict
 
 
 class TextMasker:
-    """文本掩码器"""
+    """Text masker."""
 
-    # 占位符风格切换：english_bracket（默认 [PERSON_1]）/ chinese_angle（<人物1>）/ chinese_bracket（〔姓名1〕）
-    # 切换时 placeholder_templates 整体替换；不影响 partial 掩码
+    # Placeholder style switch: english_bracket (default [PERSON_1]) / chinese_angle (<人物1>) / chinese_bracket (〔姓名1〕)
+    # On switch, placeholder_templates is replaced wholesale; partial masking is not affected.
     _CHINESE_LABELS = {
         'person': '人物', 'company': '公司', 'address': '地址', 'full_address': '地址',
         'law_firm': '律所', 'institution': '机构', 'government': '政府', 'court': '法院',
@@ -34,19 +33,19 @@ class TextMasker:
     }
 
     def __init__(self):
-        self.mapping = {}  # 原始值 -> 占位符
-        self.reverse_mapping = {}  # 占位符 -> 原始值
+        self.mapping = {}  # original value -> placeholder
+        self.reverse_mapping = {}  # placeholder -> original value
         self.counter = defaultdict(int)
         self.replacement_log = []
-        self.abbreviation_map = {}  # 简称 -> 全称
-        self.placeholder_style = 'english_bracket'  # 默认风格
-        # 默认英文模板的副本，切回 english_bracket 时复原用
-        self._default_templates = None  # 在 placeholder_templates 定义后填充
+        self.abbreviation_map = {}  # short name -> full name
+        self.placeholder_style = 'english_bracket'  # default style
+        # Copy of the default English templates, used to restore when switching back to english_bracket
+        self._default_templates = None  # filled in after placeholder_templates is defined
 
-        # 掩码策略定义
-        # 可以是 "placeholder"（占位符）或 "partial"（部分掩码）
+        # Masking strategy definitions.
+        # Can be "placeholder" or "partial" (partial mask).
         self.mask_strategies = {
-            # ========== 默认策略: 占位符 ==========
+            # ========== Default strategy: placeholder ==========
             'person': 'placeholder',
             'company': 'placeholder',
             'address': 'placeholder',
@@ -71,7 +70,7 @@ class TextMasker:
             'contract_number': 'placeholder',
             'invoice_number': 'placeholder',
 
-            # ========== 部分掩码策略 ==========
+            # ========== Partial masking strategy ==========
             'id_card': 'partial',
             'phone': 'partial',
             'fax': 'partial',
@@ -86,7 +85,7 @@ class TextMasker:
             'license_plate': 'partial',
             'vin': 'partial',
 
-            # ========== 占位符（简单类型） ==========
+            # ========== Placeholder (simple types) ==========
             'ip_address': 'placeholder',
             'mac_address': 'placeholder',
             'amount': 'placeholder',
@@ -107,10 +106,10 @@ class TextMasker:
             'patent_number': 'placeholder',
             'document_number': 'placeholder',
             'project_name': 'placeholder',
-            'secret': 'placeholder',  # API key / token（LLM 检测专有）
+            'secret': 'placeholder',  # API key / token (LLM detection only)
         }
 
-        # 占位符模板
+        # Placeholder templates
         self.placeholder_templates = {
             'person': '[PERSON_{}]',
             'company': '[COMPANY_{}]',
@@ -172,38 +171,38 @@ class TextMasker:
             'secret': '[SECRET_{}]',
             'unknown': '[UNKNOWN_{}]',
         }
-        # 保留默认英文模板的副本，切风格时用作复原参考
+        # Keep a copy of the default English templates as a reference when restoring on style switch
         self._default_templates = dict(self.placeholder_templates)
 
     def set_strategy(self, entity_type: str, strategy: str):
         """
-        设置指定类型的掩码策略
+        Set the masking strategy for a given type.
 
         Args:
-            entity_type: 实体类型
-            strategy: 'placeholder'（占位符）或 'partial'（部分掩码）
+            entity_type: Entity type
+            strategy: 'placeholder' or 'partial' (partial mask)
         """
         if strategy in ['placeholder', 'partial']:
             self.mask_strategies[entity_type] = strategy
 
     def set_placeholder_style(self, style: str):
         """
-        设置占位符风格：
-          - english_bracket: [PERSON_1] [COMPANY_1]（默认）
+        Set the placeholder style:
+          - english_bracket: [PERSON_1] [COMPANY_1] (default)
           - chinese_angle:   <人物1> <公司1>
           - chinese_bracket: 〔姓名1〕〔公司1〕
-        切换后所有 placeholder 类型的模板会被一次性替换。
-        partial 掩码（如 138****5678）不受影响。
+        After switching, all placeholder type templates are replaced at once.
+        Partial masks (e.g. 138****5678) are not affected.
         """
         if style not in ('english_bracket', 'chinese_angle', 'chinese_bracket'):
             return
         self.placeholder_style = style
         if style == 'english_bracket':
-            # 复原默认英文模板
+            # Restore the default English templates
             for etype, tpl in self._default_templates.items():
                 self.placeholder_templates[etype] = tpl
             return
-        # 中文风格：基于 _CHINESE_LABELS 重建模板
+        # Chinese styles: rebuild templates from _CHINESE_LABELS
         wrappers = {
             'chinese_angle': ('<', '>'),
             'chinese_bracket': ('〔', '〕'),
@@ -215,37 +214,37 @@ class TextMasker:
 
     def set_all_strategy(self, strategy: str):
         """
-        设置所有类型的掩码策略
+        Set the masking strategy for all types.
 
         Args:
-            strategy: 'placeholder' 或 'partial'
+            strategy: 'placeholder' or 'partial'
         """
         for entity_type in self.mask_strategies:
             self.mask_strategies[entity_type] = strategy
 
     def _mask_partial(self, text: str, entity_type: str) -> str:
         """
-        部分掩码 - 保留部分原始信息
+        Partial mask - keep part of the original information.
 
         Args:
-            text: 原始文本
-            entity_type: 实体类型
+            text: Original text
+            entity_type: Entity type
 
         Returns:
-            部分掩码后的文本
+            The partially masked text
         """
         if entity_type == 'id_card':
-            # 身份证：保留前3位和后2位
+            # ID number: keep the first 3 and last 2 digits
             if len(text) >= 5:
                 return text[:3] + '*' * (len(text) - 5) + text[-2:]
             return '*' * len(text)
 
         elif entity_type in ['phone', 'fax', 'toll_free']:
-            # 手机号/电话：保留前3位和后2位
+            # Mobile / landline number: keep the first 3 and last 2 digits
             digits = ''.join([c for c in text if c.isdigit()])
             if len(digits) >= 5:
                 masked = digits[:3] + '*' * (len(digits) - 5) + digits[-2:]
-                # 尝试恢复原始格式
+                # Try to restore the original format
                 result = []
                 digit_idx = 0
                 for c in text:
@@ -258,13 +257,13 @@ class TextMasker:
             return text
 
         elif entity_type == 'bank_account':
-            # 银行卡号：保留前4位和后4位
+            # Bank card number: keep the first 4 and last 4 digits
             if len(text) >= 8:
                 return text[:4] + '*' * (len(text) - 8) + text[-4:]
             return '*' * len(text)
 
         elif entity_type == 'email':
-            # 邮箱：保留域名，用户名部分掩码
+            # Email: keep the domain, partially mask the username
             if '@' in text:
                 username, domain = text.split('@', 1)
                 if len(username) <= 2:
@@ -275,41 +274,41 @@ class TextMasker:
             return text
 
         elif entity_type in ['passport', 'hk_macau_pass', 'taiwan_pass', 'military_id']:
-            # 护照等：保留前2位和后2位
+            # Passport, etc.: keep the first 2 and last 2 characters
             if len(text) >= 4:
                 return text[:2] + '*' * (len(text) - 4) + text[-2:]
             return '*' * len(text)
 
         elif entity_type == 'credit_code':
-            # 统一社会信用代码：保留前4位和后4位
+            # Unified social credit code: keep the first 4 and last 4 characters
             if len(text) >= 8:
                 return text[:4] + '*' * (len(text) - 8) + text[-4:]
             return '*' * len(text)
 
         elif entity_type == 'license_plate':
-            # 车牌号：保留前2位和后1位
+            # License plate: keep the first 2 and last 1 characters
             if len(text) >= 3:
                 return text[:2] + '*' * (len(text) - 3) + text[-1:]
             return '*' * len(text)
 
         elif entity_type == 'vin':
-            # VIN：保留前3位和后3位
+            # VIN: keep the first 3 and last 3 characters
             if len(text) >= 6:
                 return text[:3] + '*' * (len(text) - 6) + text[-3:]
             return '*' * len(text)
 
         elif entity_type == 'person':
-            # 中文人名：保留姓氏，名字星号化（张三 → 张*；张三丰 → 张**）
+            # Chinese personal name: keep the surname, star out the given name (张三 -> 张*; 张三丰 -> 张**)
             if len(text) >= 2:
                 return text[0] + '*' * (len(text) - 1)
             return text
 
         elif entity_type in ('company', 'law_firm', 'institution', 'court',
                               'government', 'bank_name'):
-            # 公司/机构：保留品牌首字 + 完整后缀，使读者能辨识"是个公司"但不知具体哪家
-            # 例：北京XX（深圳）律师事务所 → 北*****律师事务所
-            #     深圳市XX物流有限公司 → 深*****有限公司
-            #     广东省深圳市龙岗区人民法院 → 广*****人民法院
+            # Company/institution: keep the first brand character + full suffix, so the reader can tell "it is a company" but not which one
+            # e.g. 北京XX（深圳）律师事务所 -> 北*****律师事务所
+            #      深圳市XX物流有限公司 -> 深*****有限公司
+            #      广东省深圳市龙岗区人民法院 -> 广*****人民法院
             suffixes = [
                 '中级人民法院', '高级人民法院', '人民法院', '人民检察院',
                 '律师事务所', '会计师事务所', '事务所',
@@ -323,32 +322,32 @@ class TextMasker:
                     if len(core) >= 1:
                         return core[0] + '*' * max(len(core) - 1, 1) + sfx
                     return sfx
-            # 没有匹配后缀：保留首字 + 星号
+            # No matching suffix: keep the first character + stars
             if len(text) >= 2:
                 return text[0] + '*' * (len(text) - 1)
             return '*' * len(text)
 
-        # 默认：全部替换为星号
+        # Default: replace everything with stars
         return '*' * len(text)
 
     def set_abbreviation_map(self, abbrev_map: dict):
-        """设置简称→全称映射，使简称与全称共享同一占位符"""
+        """Set the short-name -> full-name map so the short name and full name share the same placeholder."""
         self.abbreviation_map = abbrev_map or {}
 
     def _mask_placeholder(self, text: str, entity_type: str) -> str:
         """
-        占位符掩码 - 使用 [TYPE_1] 格式
+        Placeholder mask - uses the [TYPE_1] format.
 
         Args:
-            text: 原始文本
-            entity_type: 实体类型
+            text: Original text
+            entity_type: Entity type
 
         Returns:
-            占位符文本
+            The placeholder text
         """
         key = (entity_type, text)
         if key not in self.mapping:
-            # 检查是否为简称，若是则复用全称的占位符
+            # Check whether it is a short name; if so, reuse the full name's placeholder
             if text in self.abbreviation_map:
                 full_name = self.abbreviation_map[text]
                 full_key = (entity_type, full_name)
@@ -364,20 +363,20 @@ class TextMasker:
 
     def mask(self, text: str, entity_type: str) -> str:
         """
-        掩码单个实体
+        Mask a single entity.
 
         Args:
-            text: 原始文本
-            entity_type: 实体类型
+            text: Original text
+            entity_type: Entity type
 
         Returns:
-            掩码后的文本
+            The masked text
         """
         strategy = self.mask_strategies.get(entity_type, 'placeholder')
 
         if strategy == 'partial':
             masked = self._mask_partial(text, entity_type)
-            # 记录映射关系，确保可逆
+            # Record the mapping to keep it reversible
             key = (entity_type, text)
             if key not in self.mapping:
                 self.mapping[key] = masked
@@ -388,14 +387,14 @@ class TextMasker:
 
     def mask_all(self, text: str, entities: List[Tuple[str, str, int]]) -> Tuple[str, Dict]:
         """
-        批量掩码文本中的所有实体
+        Mask all entities in the text in bulk.
 
         Args:
-            text: 原始文本
-            entities: 实体列表 [(实体文本, 实体类型, 位置), ...]
+            text: Original text
+            entities: Entity list [(entity text, entity type, position), ...]
 
         Returns:
-            (掩码后文本, 详细映射信息)
+            (masked text, detailed mapping info)
         """
         self.mapping = {}
         self.reverse_mapping = {}
@@ -404,14 +403,14 @@ class TextMasker:
 
         result = text
 
-        # 按位置从后往前处理，避免位置偏移问题
-        # 或者按长度降序排序，避免子字符串匹配问题
+        # Process from the end to the start by position, to avoid offset issues
+        # Or sort by length descending, to avoid substring match issues
         sorted_entities = sorted(entities, key=lambda x: (-len(x[0]), x[2]))
 
-        # 先收集所有替换，然后一次性应用
+        # Collect all replacements first, then apply them at once
         replacements = []
         for entity_text, entity_type, pos in sorted_entities:
-            # 检查是否已经被覆盖
+            # Check whether it is already covered
             skip = False
             for repl in replacements:
                 existing_pos = repl[2]
@@ -428,7 +427,7 @@ class TextMasker:
             masked_text = self.mask(entity_text, entity_type)
             replacements.append((entity_text, masked_text, pos, len(entity_text), entity_type))
 
-        # 按位置从后往前应用替换
+        # Apply replacements from the end to the start by position
         replacements.sort(key=lambda x: -x[2])
 
         for entity_text, masked_text, pos, length, entity_type in replacements:
@@ -446,7 +445,7 @@ class TextMasker:
 
             result = result[:pos] + masked_text + result[pos + length:]
 
-        # 构建映射表
+        # Build the mapping table
         mapping_result = {}
         for (etype, original), placeholder in self.mapping.items():
             if placeholder not in mapping_result:
@@ -467,14 +466,14 @@ class TextMasker:
         return result, detailed_mapping
 
     def get_mapping(self) -> Dict:
-        """获取简化版映射表"""
+        """Return a simplified mapping table."""
         result = {}
         for (etype, original), placeholder in self.mapping.items():
             result[placeholder] = {'type': etype, 'original': original}
         return result
 
     def reset(self):
-        """重置状态"""
+        """Reset state."""
         self.mapping = {}
         self.reverse_mapping = {}
         self.counter = defaultdict(int)

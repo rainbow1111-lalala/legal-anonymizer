@@ -1,31 +1,36 @@
 """
-OllamaDetector — 本地大模型 PII 检测层
+OllamaDetector — local LLM PII detection layer
 
-通过 Ollama 的 OpenAI 兼容接口（/v1/chat/completions）调用本地部署的大模型，
-让模型以 JSON 格式返回文中出现的敏感实体，再将实体文本映射回原文位置。
+Calls a locally deployed LLM through Ollama's OpenAI-compatible endpoint
+(/v1/chat/completions), asks the model to return the sensitive entities found in
+the text as JSON, then maps each entity string back to its position in the source.
 
-定位：第 5 层补充检测，只覆盖前四层（正则 + 规则 + CN NER + OpenAI privacy-filter）
-未覆盖的位置。适合处理：
-  - 上下文高度依赖的人名识别（如"甲方的法定代表人"后紧跟名字）
-  - 规则难以枚举的特殊机构名、地名缩写
-  - 中英混合复杂语境下的综合推理
+Role: the 5th supplementary layer. It only covers what the first four layers
+(regex + rules + CN NER + OpenAI privacy-filter) miss. Good for:
+  - Highly context-dependent person names (e.g. a name right after "the Party A's
+    legal representative")
+  - Special institution names and place-name abbreviations that rules cannot enumerate
+  - General reasoning in complex mixed Chinese/English contexts
 
-配置方式：
-  环境变量：
-    LEGAL_ANONYMIZER_OLLAMA=1            启用本层（默认关闭）
-    LEGAL_ANONYMIZER_OLLAMA_URL=http://host:11434   Ollama 服务地址（默认 localhost:11434）
-    LEGAL_ANONYMIZER_OLLAMA_MODEL=qwen2.5:7b        模型名（默认 qwen2.5:7b）
+Configuration:
+  Environment variables:
+    LEGAL_ANONYMIZER_OLLAMA=1            Enable this layer (off by default)
+    LEGAL_ANONYMIZER_OLLAMA_URL=http://host:11434   Ollama service URL (default localhost:11434)
+    LEGAL_ANONYMIZER_OLLAMA_MODEL=qwen2.5:7b        Model name (default qwen2.5:7b)
 
-  CLI 参数（见 cli.py）：
-    --ollama                启用
-    --ollama-url URL        服务地址
-    --ollama-model MODEL    模型名
+  CLI flags (see cli.py):
+    --ollama                enable
+    --ollama-url URL        service URL
+    --ollama-model MODEL    model name
 
-注意：
-  - Gemma 系列经由 /v1 接口默认会启动思考（reasoning），导致正文为空。
-    本模块对 gemma 模型自动添加 extra_body={"reasoning_effort": "none"} 绕过此问题。
-  - 本层使用生成式 LLM（不是 token classifier），通过实体文本字符串反查位置，
-    不会因"输出位置"错误而影响脱敏正确性（最差结果是不命中，而非误报位置）。
+Notes:
+  - Gemma models default to "thinking" (reasoning) over the /v1 endpoint, which
+    leaves the message body empty. This module automatically adds
+    extra_body={"reasoning_effort": "none"} for gemma models to work around it.
+  - This layer uses a generative LLM (not a token classifier). It locates entities
+    by searching the source for the returned entity strings, so a wrong "output
+    position" cannot break redaction correctness (the worst case is a miss, not a
+    misplaced false positive).
 """
 
 from __future__ import annotations
@@ -40,7 +45,7 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# 本层识别的类型 → 项目内部类型
+# Types recognized by this layer -> internal project types
 OLLAMA_TYPE_MAP = {
     "person":       "person",
     "company":      "company",
@@ -93,7 +98,7 @@ context-dependent names, addresses, and compound identifiers.
 
 
 class OllamaDetector:
-    """本地 Ollama 大模型 PII 检测器（第 5 补充层）"""
+    """Local Ollama LLM PII detector (the 5th supplementary layer)"""
 
     def __init__(
         self,
@@ -108,10 +113,10 @@ class OllamaDetector:
         self.max_chars = max_chars
         self._available: Optional[bool] = None
 
-    # ───────────────── 可用性探测 ─────────────────
+    # ───────────────── Availability probe ─────────────────
 
     def _probe(self) -> bool:
-        """向 Ollama 发一次 /api/tags 请求确认服务可达"""
+        """Send one /api/tags request to confirm the Ollama service is reachable"""
         try:
             req = urllib.request.Request(
                 f"{self.base_url}/api/tags",
@@ -121,7 +126,7 @@ class OllamaDetector:
                 pass
             return True
         except Exception as e:
-            logger.warning(f"[ollama] 无法连接 {self.base_url}: {e}")
+            logger.warning(f"[ollama] Cannot connect to {self.base_url}: {e}")
             return False
 
     @property
@@ -130,7 +135,7 @@ class OllamaDetector:
             self._available = self._probe()
         return self._available
 
-    # ───────────────── 检测主入口 ─────────────────
+    # ───────────────── Main detection entry point ─────────────────
 
     def detect(
         self,
@@ -139,8 +144,8 @@ class OllamaDetector:
         exclude_types: Optional[List[str]] = None,
     ) -> List[Tuple[str, str, int]]:
         """
-        检测 PII，返回 [(entity_text, mapped_type, start_pos), ...]
-        与其他 Detector.detect() 签名对齐。
+        Detect PII, returning [(entity_text, mapped_type, start_pos), ...].
+        Signature aligns with the other Detector.detect() methods.
         """
         if not text or not self.available:
             return []
@@ -155,7 +160,7 @@ class OllamaDetector:
                     continue
                 if exclude_types and mapped_type in exclude_types:
                     continue
-                # 在原文中查找该实体的所有出现位置
+                # Find every occurrence of this entity in the source text
                 idx = 0
                 while True:
                     pos = text.find(entity_text, idx)
@@ -166,10 +171,10 @@ class OllamaDetector:
 
         return self._dedupe(results)
 
-    # ───────────────── 模型调用 ─────────────────
+    # ───────────────── Model call ─────────────────
 
     def _call_model(self, text_chunk: str) -> Optional[str]:
-        """调用 Ollama /v1/chat/completions，返回模型输出文本"""
+        """Call Ollama /v1/chat/completions and return the model's output text"""
         payload: dict = {
             "model": self.model,
             "messages": [
@@ -180,8 +185,8 @@ class OllamaDetector:
             "stream": False,
         }
 
-        # Gemma 系列通过 /v1 默认会开启思考（reasoning），导致 content 为空
-        # 通过 extra_body 传入 reasoning_effort=none 关闭
+        # Gemma models default to "thinking" (reasoning) over /v1, which leaves content empty.
+        # Pass reasoning_effort=none via extra_body to turn it off.
         if "gemma" in self.model.lower():
             payload["extra_body"] = {"reasoning_effort": "none"}
 
@@ -203,30 +208,30 @@ class OllamaDetector:
             )
             return content or None
         except urllib.error.URLError as e:
-            logger.warning(f"[ollama] 请求失败: {e}")
-            self._available = False  # 标记不可用，后续跳过
+            logger.warning(f"[ollama] Request failed: {e}")
+            self._available = False  # Mark unavailable so later chunks are skipped
             return None
         except Exception as e:
-            logger.warning(f"[ollama] 意外错误: {e}")
+            logger.warning(f"[ollama] Unexpected error: {e}")
             return None
 
-    # ───────────────── 结果解析 ─────────────────
+    # ───────────────── Response parsing ─────────────────
 
     def _parse_response(self, content: str) -> List[Tuple[str, str]]:
         """
-        解析模型返回的 JSON，返回 [(entity_text, mapped_type), ...]。
-        容错：处理 markdown 代码块、不完整 JSON、额外说明文字等。
+        Parse the JSON returned by the model into [(entity_text, mapped_type), ...].
+        Tolerant of markdown code fences, incomplete JSON, extra explanatory text, etc.
         """
-        # 去掉 markdown 代码块包裹
+        # Strip the markdown code-fence wrapper
         content = re.sub(r"```(?:json)?\s*", "", content).strip()
-        # 尝试提取第一个 {...} 块
+        # Try to extract the first {...} block
         match = re.search(r"\{.*\}", content, re.DOTALL)
         if not match:
             return []
         try:
             obj = json.loads(match.group())
         except json.JSONDecodeError:
-            logger.debug(f"[ollama] JSON 解析失败，原始输出: {content[:200]}")
+            logger.debug(f"[ollama] JSON parse failed, raw output: {content[:200]}")
             return []
 
         entities = obj.get("entities", [])
@@ -249,11 +254,11 @@ class OllamaDetector:
             results.append((raw_text, mapped))
         return results
 
-    # ───────────────── 工具方法 ─────────────────
+    # ───────────────── Utilities ─────────────────
 
     @staticmethod
     def _split_chunks(text: str, max_chars: int) -> List[Tuple[str, int]]:
-        """按 max_chars 切块，尽量在段落/句号处断开，返回 [(chunk_text, offset)]"""
+        """Split into chunks of max_chars, breaking on paragraph/sentence boundaries where possible; returns [(chunk_text, offset)]"""
         if len(text) <= max_chars:
             return [(text, 0)]
         chunks = []
@@ -283,7 +288,7 @@ class OllamaDetector:
         return out
 
 
-# ───────────────── 进程级单例 ─────────────────
+# ───────────────── Process-level singleton ─────────────────
 
 _SHARED: Optional[OllamaDetector] = None
 

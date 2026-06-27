@@ -1,6 +1,5 @@
 """
 File Processor - Handles reading/writing various file formats
-文件处理器 - 处理各种文件格式的读写
 """
 
 import os
@@ -9,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 
-# 尝试导入可选依赖
+# Try importing optional dependencies
 try:
     import fitz  # PyMuPDF
     HAS_PYMUPDF = True
@@ -49,7 +48,7 @@ except ImportError:
 
 
 def _io_bytes_png(pil_image) -> bytes:
-    """PIL Image → PNG bytes，避免每次写临时文件"""
+    """PIL Image -> PNG bytes, avoids writing a temp file each time"""
     import io as _io
     buf = _io.BytesIO()
     pil_image.save(buf, format='PNG')
@@ -67,29 +66,29 @@ try:
 except ImportError:
     HAS_TESSERACT = False
 
-# 至少有一种 OCR 引擎可用
+# At least one OCR engine is available
 HAS_OCR = HAS_PIL and (HAS_RAPIDOCR or HAS_PADDLEOCR or HAS_TESSERACT)
 
 
 class FileProcessor:
-    """文件处理器"""
+    """File processor"""
 
-    # 引擎单例缓存
+    # Engine singleton cache
     _rapidocr_instance = None
     _paddle_ocr_instance = None
 
     @classmethod
     def _get_rapidocr(cls):
-        """懒加载 RapidOCR 实例（默认引擎，轻量、快速）"""
+        """Lazy-load the RapidOCR instance (default engine, lightweight and fast)"""
         if cls._rapidocr_instance is None and HAS_RAPIDOCR:
             cls._rapidocr_instance = _RapidOCR()
         return cls._rapidocr_instance
 
     @classmethod
     def _get_paddle_ocr(cls):
-        """懒加载 PaddleOCR 实例（精准模式，慢但对复杂排版更强）"""
+        """Lazy-load the PaddleOCR instance (accurate mode, slower but stronger on complex layouts)"""
         if cls._paddle_ocr_instance is None and HAS_PADDLEOCR:
-            # PaddleOCR 3.5 使用 mobile 模型（server 模型 CPU 推理太慢）
+            # PaddleOCR 3.5 uses the mobile model (the server model is too slow for CPU inference)
             cls._paddle_ocr_instance = _PaddleOCR(
                 lang='ch',
                 use_textline_orientation=True,
@@ -107,21 +106,21 @@ class FileProcessor:
     def extract_text(self, file_path: str, use_ocr: bool = False, ocr_engine: str = 'rapidocr',
                      progress_callback=None) -> str:
         """
-        从文件中提取文本
+        Extract text from a file
 
         Args:
-            file_path: 文件路径
-            use_ocr: 是否使用OCR（仅适用于PDF/图片）
-            ocr_engine: 'rapidocr'（默认，快）| 'paddleocr'（慢但精准）| 'tesseract'（兜底）
-            progress_callback: 可选的进度回调，签名 fn(stage:str, current:int, total:int)
-                              stage 可为 'ocr_page_done' / 'extract_done'
+            file_path: file path
+            use_ocr: whether to use OCR (PDF/image only)
+            ocr_engine: 'rapidocr' (default, fast) | 'paddleocr' (slow but accurate) | 'tesseract' (fallback)
+            progress_callback: optional progress callback, signature fn(stage:str, current:int, total:int)
+                              stage can be 'ocr_page_done' / 'extract_done'
 
         Returns:
-            提取的文本内容
+            the extracted text content
         """
         path = Path(file_path)
         if not path.exists():
-            raise FileNotFoundError(f"文件不存在: {file_path}")
+            raise FileNotFoundError(f"File not found: {file_path}")
 
         suffix = path.suffix.lower()
 
@@ -136,43 +135,44 @@ class FileProcessor:
         elif suffix in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.webp']:
             text = self._extract_image_text(file_path, ocr_engine)
         else:
-            # 默认尝试作为文本文件读取
+            # By default, try reading it as a text file
             try:
                 text = self._extract_plain_text(file_path)
             except:
-                raise ValueError(f"不支持的文件格式: {suffix}")
+                raise ValueError(f"Unsupported file format: {suffix}")
 
-        # 中文字间换行合并：PDF 抽取时排版导致的中文字符间换行（如"XX\n公司"、"姓\n名"）
-        # 会把同一实体拆成多个片段，规范化后再交给检测层
+        # Merge line breaks between CJK characters: PDF extraction layout can insert line breaks
+        # between Chinese characters (e.g. "XX\n公司", "姓\n名"), splitting one entity into
+        # multiple fragments. Normalize before handing off to the detection layer.
         return self._normalize_cjk_linebreaks(text)
 
     @staticmethod
     def _normalize_cjk_linebreaks(text: str) -> str:
         """
-        1. 去掉 XML 不允许的控制字符（NULL 字节等）—— OCR 输出常见
-        2. 合并两个中文字符之间的单个换行符（保留段落换行=连续换行）
+        1. Strip control characters not allowed in XML (NULL bytes, etc.) -- common in OCR output
+        2. Merge a single line break between two Chinese characters (keep paragraph breaks = consecutive line breaks)
         """
         import re
-        # 先清除 XML 非法控制字符，防止下游 docx/PDF 写入失败
+        # First strip XML-illegal control characters, to avoid downstream docx/PDF write failures
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-        # 单个 \n（前后都是中文），替换为空
+        # A single \n (Chinese on both sides), replace with nothing
         text = re.sub(r'([一-龥])\n([一-龥])', r'\1\2', text)
-        # 中文+\n+中文标点
+        # Chinese + \n + Chinese punctuation
         text = re.sub(r'([一-龥])\n([（）《》、，。；：])', r'\1\2', text)
         text = re.sub(r'([（《、，。；：])\n([一-龥])', r'\1\2', text)
-        # 数字与中文互相粘接的换行（地址"宿舍6 栋\n102"、案号"（2006）192\n号"）
+        # Line break joining a digit and Chinese (address "宿舍6 栋\n102", case number "（2006）192\n号")
         text = re.sub(r'([一-龥])\n(\d)', r'\1\2', text)
         text = re.sub(r'(\d)\n([一-龥])', r'\1\2', text)
-        # 中文和英文字母之间的换行（"SOHO现代城A座1203\n室"这类）
+        # Line break between Chinese and Latin letters (e.g. "SOHO现代城A座1203\n室")
         text = re.sub(r'([一-龥])\n([A-Za-z])', r'\1\2', text)
         text = re.sub(r'([A-Za-z])\n([一-龥])', r'\1\2', text)
         return text
 
     def _extract_pdf_text(self, pdf_path: str, use_ocr: bool = False, ocr_engine: str = 'rapidocr',
                           progress_callback=None) -> str:
-        """从PDF提取文本。ocr_engine: rapidocr(默认) | paddleocr | tesseract"""
+        """Extract text from a PDF. ocr_engine: rapidocr (default) | paddleocr | tesseract"""
         if not HAS_PYMUPDF:
-            raise ImportError("需要安装 PyMuPDF: pip install pymupdf")
+            raise ImportError("PyMuPDF is required: pip install pymupdf")
 
         import time as _time
         from concurrent.futures import ThreadPoolExecutor
@@ -180,34 +180,35 @@ class FileProcessor:
         doc = fitz.open(pdf_path)
         page_count = doc.page_count
 
-        # 先决定每一页走 OCR 还是直接抽取（PDF 渲染必须在主线程，PyMuPDF Page 不是线程安全的）
+        # First decide per page whether to OCR or extract directly (PDF rendering must run on the
+        # main thread; PyMuPDF Page is not thread-safe)
         page_jobs = []  # [(page_num, native_text, ocr_image_or_None)]
         for page_num, page in enumerate(doc, 1):
             native_text = page.get_text()
             need_ocr = use_ocr or (HAS_OCR and len(native_text.strip()) < 50)
-            # use_ocr=True 但页面已有充足文字层时，不强制 OCR（省 5-10x 时间）
+            # use_ocr=True but the page already has an adequate text layer: do not force OCR (saves 5-10x time)
             if use_ocr and len(native_text.strip()) >= 200:
                 need_ocr = False
 
             ocr_img = None
             if need_ocr and HAS_PIL:
-                # 主线程渲染像素图（150 DPI）
+                # Render the pixmap on the main thread (150 DPI)
                 pix = page.get_pixmap(matrix=fitz.Matrix(2.08, 2.08))
                 ocr_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                pix = None  # 早释放
+                pix = None  # release early
             page_jobs.append((page_num, native_text, ocr_img))
 
-        doc.close()  # 释放 PDF 资源，OCR 阶段不再需要
+        doc.close()  # release PDF resources, no longer needed during the OCR stage
 
         ocr_pages = sum(1 for _, _, img in page_jobs if img is not None)
         if ocr_pages > 0:
-            print(f"[OCR] 共 {page_count} 页，需要 OCR 的 {ocr_pages} 页（其余直接抽取文字层）", flush=True)
+            print(f"[OCR] {page_count} pages total, {ocr_pages} need OCR (the rest extract the text layer directly)", flush=True)
 
-        # 多线程并行：ONNX Runtime 内部已多线程，2 worker 已经能让 CPU 跑满
-        # 太多 worker 反而内存压力大且效益递减
+        # Multithreading: ONNX Runtime is already multithreaded internally; 2 workers already saturate the CPU.
+        # Too many workers add memory pressure with diminishing returns.
         max_workers = min(2, ocr_pages or 1)
 
-        # 用计数器，多线程下也安全（GIL 保护 int += 1）
+        # Use a counter, safe under multithreading (the GIL protects int += 1)
         ocr_done_counter = [0]
         ocr_total = ocr_pages
 
@@ -218,7 +219,7 @@ class FileProcessor:
                 text = self._ocr_image(ocr_img, ocr_engine)
                 text = self._fix_ocr_text(text)
                 elapsed = _time.time() - t0
-                print(f"[OCR] 第 {page_num}/{page_count} 页完成，耗时 {elapsed:.1f}s", flush=True)
+                print(f"[OCR] Page {page_num}/{page_count} done, took {elapsed:.1f}s", flush=True)
                 ocr_done_counter[0] += 1
                 if progress_callback:
                     try:
@@ -242,27 +243,27 @@ class FileProcessor:
         return '\n\n'.join(text_parts)
 
     def _ocr_pdf_page(self, page, ocr_engine: str = 'rapidocr') -> str:
-        """对 PDF 页面做 OCR。先渲染成图像，再调引擎"""
+        """OCR a PDF page. Render to an image first, then call the engine"""
         if not HAS_PIL:
             return ""
 
         try:
-            # 150 DPI 渲染（法律文书清晰度足够，比 200 DPI 快约 30%）
-            pix = page.get_pixmap(matrix=fitz.Matrix(2.08, 2.08))  # 2.08 × 72 ≈ 150
+            # Render at 150 DPI (sharp enough for legal documents, about 30% faster than 200 DPI)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.08, 2.08))  # 2.08 x 72 ~ 150
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             return self._ocr_image(img, ocr_engine)
         except Exception:
             return ""
 
     def _ocr_image(self, img, ocr_engine: str = 'rapidocr') -> str:
-        """对 PIL Image 做 OCR，按指定引擎优先级尝试"""
-        # 按指定引擎尝试
+        """OCR a PIL Image, trying engines in the given priority order"""
+        # Try engines in the specified order
         engines_order = []
         if ocr_engine == 'paddleocr':
             engines_order = ['paddleocr', 'rapidocr', 'tesseract']
         elif ocr_engine == 'tesseract':
             engines_order = ['tesseract', 'rapidocr', 'paddleocr']
-        else:  # 默认 rapidocr
+        else:  # default rapidocr
             engines_order = ['rapidocr', 'paddleocr', 'tesseract']
 
         for eng in engines_order:
@@ -279,12 +280,12 @@ class FileProcessor:
         return ""
 
     def _ocr_with_rapidocr(self, img) -> str:
-        """RapidOCR 实现：快、轻量、默认选择
-        优化：直接传 numpy 数组，跳过 PNG 编码（每页省 200-500ms）
+        """RapidOCR implementation: fast, lightweight, the default choice
+        Optimization: pass the numpy array directly, skipping PNG encoding (saves 200-500ms per page)
         """
         import numpy as np
         ocr = self._get_rapidocr()
-        # PIL Image -> numpy（RapidOCR 直接接受 numpy 数组）
+        # PIL Image -> numpy (RapidOCR accepts numpy arrays directly)
         img_array = np.array(img)
         result = ocr(img_array)
         if result and result.txts:
@@ -296,7 +297,7 @@ class FileProcessor:
         return ""
 
     def _ocr_with_paddleocr(self, img) -> str:
-        """PaddleOCR 3.5 实现：慢但对复杂排版更准"""
+        """PaddleOCR 3.5 implementation: slow but more accurate on complex layouts"""
         import numpy as np
         ocr = self._get_paddle_ocr()
         img_array = np.array(img)
@@ -304,7 +305,7 @@ class FileProcessor:
         if result:
             lines = []
             for page_result in result:
-                # PaddleOCR 3.5 返回 dict-like 结果，含 rec_texts / rec_scores
+                # PaddleOCR 3.5 returns a dict-like result containing rec_texts / rec_scores
                 rec_texts = page_result.get('rec_texts') if hasattr(page_result, 'get') else None
                 rec_scores = page_result.get('rec_scores') if hasattr(page_result, 'get') else None
                 if rec_texts:
@@ -318,37 +319,37 @@ class FileProcessor:
         return ""
 
     def _ocr_with_tesseract(self, img) -> str:
-        """Tesseract 兜底"""
+        """Tesseract fallback"""
         custom_config = r'-l chi_sim+eng --oem 1 --psm 6'
         return pytesseract.image_to_string(img, config=custom_config)
 
     def _fix_ocr_text(self, text: str) -> str:
-        """修复OCR提取文本的断行和空格问题，使句子连贯"""
+        """Fix line-break and spacing issues in OCR-extracted text so sentences flow"""
         import re
 
-        # 第一步：去除OCR噪音字符（扫描边缘产生的竖线、乱码等）
-        # 去掉行尾/行首的 | 和其他常见OCR噪音
+        # Step 1: remove OCR noise characters (vertical bars, garbage from scan edges, etc.)
+        # Drop trailing/leading | and other common OCR noise
         text = re.sub(r'\s*\|\s*', '', text)
-        # 去掉单独的乱码字符（非中文、非ASCII字母数字、非标点的孤立字符）
-        # 保留中文、英文字母、数字、常见标点
+        # Drop isolated garbage characters (lone chars that are not Chinese, ASCII alphanumeric, or punctuation)
+        # Keep Chinese, Latin letters, digits, and common punctuation
         text = re.sub(r'(?<=[。，、；：！？）\)）])\s*[a-zA-Z]{1,3}\s*(?=\n|$)', '', text)
 
-        # 第二步：清理多余空白
-        # 压缩连续空格为单个
+        # Step 2: clean up extra whitespace
+        # Collapse consecutive spaces into one
         text = re.sub(r'[ \t]{2,}', ' ', text)
 
-        # 第三步：去掉中文字符之间的空格
-        # 多轮处理确保全部清除
+        # Step 3: drop spaces between Chinese characters
+        # Run multiple passes to ensure all are removed
         for _ in range(3):
             text = re.sub(r'([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])', r'\1\2', text)
-        # 中文和数字之间的多余空格
+        # Extra spaces between Chinese and digits
         text = re.sub(r'([\u4e00-\u9fa5])\s+(\d)', r'\1\2', text)
         text = re.sub(r'(\d)\s+([\u4e00-\u9fa5])', r'\1\2', text)
-        # 中文和标点之间的空格
+        # Spaces between Chinese and punctuation
         text = re.sub(r'([\u4e00-\u9fa5])\s+([，。、；：！？）\)》」』】])', r'\1\2', text)
         text = re.sub(r'([（\(《「『【])\s+([\u4e00-\u9fa5])', r'\1\2', text)
 
-        # 第四步：合并断行
+        # Step 4: merge broken lines
         lines = text.split('\n')
         merged_lines = []
         buffer = ''
@@ -356,14 +357,14 @@ class FileProcessor:
         for line in lines:
             stripped = line.strip()
 
-            # 跳过空行
+            # Skip empty lines
             if not stripped:
                 if buffer:
                     merged_lines.append(buffer)
                     buffer = ''
                 continue
 
-            # 跳过纯噪音行（全是非中文非数字的短行）
+            # Skip pure-noise lines (short lines with no Chinese or digits)
             clean_chars = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fa5]', '', stripped)
             if len(clean_chars) < 2:
                 continue
@@ -373,12 +374,12 @@ class FileProcessor:
             else:
                 last_char = buffer[-1] if buffer else ''
 
-                # 只在明确的句子结束标点处分段
+                # Only break paragraphs at clear sentence-ending punctuation
                 if last_char in '。！？':
                     merged_lines.append(buffer)
                     buffer = stripped
                 else:
-                    # 其他情况全部合并（包括逗号、分号结尾）
+                    # In all other cases, merge (including comma/semicolon endings)
                     buffer += stripped
 
         if buffer:
@@ -387,10 +388,10 @@ class FileProcessor:
         return '\n'.join(merged_lines)
 
     def _fix_line_breaks(self, text: str) -> str:
-        """修复PDF文本提取中常见的换行分割问题（非OCR模式）"""
+        """Fix common line-break splitting in PDF text extraction (non-OCR mode)"""
         import re
 
-        # 修复组织机构名称被换行分割（通用规则）
+        # Fix organization names split by line breaks (general rule)
         org_suffixes = (
             r'有限公司|有限责任公司|股份有限公司|股份公司'
             r'|集团公司|集团|律师事务所|会计师事务所|公证处'
@@ -405,9 +406,9 @@ class FileProcessor:
             r'\1\2', text
         )
 
-        # 修复公司名在后缀之前断行的情况
-        # 例如 "国新健康保障服\n务集团股份有限公司" → 拼接
-        # 不加严格的后向断言，因为 PDF 签章页等格式后面可能直接跟"年月日"
+        # Fix the case where a company name breaks before its suffix
+        # e.g. "国新健康保障服\n务集团股份有限公司" -> joined
+        # No strict lookbehind, because formats like PDF signature pages may be followed directly by "年月日"
         text = re.sub(
             rf'([\u4e00-\u9fa5])'
             rf'\n'
@@ -415,7 +416,7 @@ class FileProcessor:
             r'\1\2', text
         )
 
-        # 修复常见的词语被换行分割
+        # Fix common words split by line breaks
         text = re.sub(
             r'([\u4e00-\u9fa5])(?<![。！？；：，、）》」』】])\n(?=[\u4e00-\u9fa5]{1,3}(?:[。！？；：，、）》」』】\n]|$))',
             r'\1', text
@@ -424,11 +425,11 @@ class FileProcessor:
         return text
 
     def _extract_doc_text(self, doc_path: str) -> str:
-        """从旧版 .doc 文件提取文本"""
+        """Extract text from a legacy .doc file"""
         import subprocess
         import platform
 
-        # macOS: 使用 textutil
+        # macOS: use textutil
         if platform.system() == 'Darwin':
             try:
                 result = subprocess.run(
@@ -440,7 +441,7 @@ class FileProcessor:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
 
-        # Linux: 尝试 antiword
+        # Linux: try antiword
         try:
             result = subprocess.run(
                 ['antiword', doc_path],
@@ -451,7 +452,7 @@ class FileProcessor:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
 
-        # Linux: 尝试 libreoffice
+        # Linux: try libreoffice
         try:
             import tempfile
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -467,16 +468,16 @@ class FileProcessor:
             pass
 
         raise ImportError(
-            "无法读取 .doc 文件。请安装以下工具之一：\n"
-            "  macOS: textutil（系统自带）\n"
-            "  Linux: sudo apt install antiword  或  sudo apt install libreoffice\n"
-            "  或者将文件转换为 .docx 格式后重试"
+            "Cannot read the .doc file. Please install one of the following tools:\n"
+            "  macOS: textutil (built in)\n"
+            "  Linux: sudo apt install antiword  or  sudo apt install libreoffice\n"
+            "  Or convert the file to .docx format and try again"
         )
 
     def _extract_docx_text(self, docx_path: str) -> str:
-        """从Word文档提取文本（过滤HYPERLINK等域代码）"""
+        """Extract text from a Word document (filtering out field codes like HYPERLINK)"""
         if not HAS_DOCX:
-            raise ImportError("需要安装 python-docx: pip install python-docx")
+            raise ImportError("python-docx is required: pip install python-docx")
 
         import re
 
@@ -494,7 +495,7 @@ class FileProcessor:
                 if text.strip():
                     content.append(text)
 
-        # 页眉页脚（各 section）
+        # Headers and footers (each section)
         for section in doc.sections:
             for hf in [section.header, section.footer,
                        section.first_page_header, section.first_page_footer,
@@ -502,10 +503,10 @@ class FileProcessor:
                 if hf and not hf.is_linked_to_previous:
                     extract_paragraphs(hf.paragraphs)
 
-        # 正文段落
+        # Body paragraphs
         extract_paragraphs(doc.paragraphs)
 
-        # 表格
+        # Tables
         for table in doc.tables:
             for row in table.rows:
                 row_text = []
@@ -520,17 +521,17 @@ class FileProcessor:
 
     def anonymize_docx_inplace(self, input_path: str, output_path: str, mapping: dict) -> bool:
         """
-        在保留原始Word文档所有格式的基础上进行脱敏替换。
+        Apply redaction replacements while preserving all formatting of the original Word document.
 
-        通过直接操作 XML 层的 <w:t> 元素实现，覆盖：
-        - 正文段落、表格、文本框
-        - 超链接内文本
-        - 页眉页脚
-        - 批注 (comments)
-        - 修订/追踪更改 (track changes: <w:ins>, <w:del>)
-        - 脚注、尾注
+        Implemented by directly manipulating <w:t> elements at the XML layer, covering:
+        - Body paragraphs, tables, text boxes
+        - Text inside hyperlinks
+        - Headers and footers
+        - Comments
+        - Revisions / track changes (<w:ins>, <w:del>)
+        - Footnotes, endnotes
 
-        所有 run 的字体、字号、颜色、加粗、段落间距等格式属性完全保留。
+        Each run's font, size, color, bold, paragraph spacing, and other formatting attributes are fully preserved.
         """
         if not HAS_DOCX:
             return False
@@ -538,13 +539,13 @@ class FileProcessor:
         try:
             from lxml import etree
         except ImportError:
-            # python-docx 自带 lxml 依赖
+            # python-docx ships with the lxml dependency
             return False
 
         try:
             doc = Document(input_path)
 
-            # 构建替换表（按长度降序，避免子串问题）
+            # Build the replacement table (descending length, to avoid substring issues)
             replacements = {}
             for (etype, original), masked in mapping.items():
                 replacements[original] = masked
@@ -561,14 +562,14 @@ class FileProcessor:
             XML_NS = 'http://www.w3.org/XML/1998/namespace'
 
             def get_t_elements_from_para(para_elem):
-                """获取段落中所有 <w:t> 元素（包括 w:ins/w:del/w:hyperlink 内部的）"""
+                """Get all <w:t> elements in a paragraph (including those inside w:ins/w:del/w:hyperlink)"""
                 return list(para_elem.iter(W_T))
 
             def replace_in_paragraph(para_elem):
-                """对单个段落做所有替换，逐个替换并刷新状态"""
+                """Apply all replacements to a single paragraph, one at a time, refreshing state"""
                 for original in sorted_originals:
                     masked = replacements[original]
-                    # 每次替换后重新获取 t 元素（因为文本已变化）
+                    # Re-fetch the t elements after each replacement (because the text has changed)
                     while True:
                         t_elems = get_t_elements_from_para(para_elem)
                         if not t_elems:
@@ -582,7 +583,7 @@ class FileProcessor:
 
                         end_pos = pos + len(original)
 
-                        # 定位到具体的 <w:t> 元素和偏移
+                        # Locate the specific <w:t> elements and offsets
                         char_idx = 0
                         start_ti = end_ti = -1
                         start_offset = end_offset = 0
@@ -606,31 +607,31 @@ class FileProcessor:
                             break
 
                         if start_ti == end_ti:
-                            # 同一个 <w:t> 内替换
+                            # Replace within the same <w:t>
                             t = t_elems[start_ti]
                             t.text = t.text[:start_offset] + masked + t.text[end_offset:]
                         else:
-                            # 跨 <w:t> 替换：替换文本放入第一个，中间清空，尾部保留
+                            # Replace across <w:t> elements: put the replacement text in the first, clear the middle, keep the tail
                             t_elems[start_ti].text = texts[start_ti][:start_offset] + masked
                             for ti in range(start_ti + 1, end_ti):
                                 t_elems[ti].text = ''
                             t_elems[end_ti].text = texts[end_ti][end_offset:]
 
-                        # 确保含前后空格的文本保留 xml:space="preserve"
+                        # Make sure text with leading/trailing spaces keeps xml:space="preserve"
                         for ti in range(start_ti, min(end_ti + 1, len(t_elems))):
                             t = t_elems[ti]
                             if t.text and (t.text[0] == ' ' or t.text[-1] == ' ' or '  ' in t.text):
                                 t.set(f'{{{XML_NS}}}space', 'preserve')
 
             def process_element_tree(root_elem):
-                """处理一个 XML 元素树中的所有段落"""
+                """Process all paragraphs in an XML element tree"""
                 for para in root_elem.iter(W_P):
                     replace_in_paragraph(para)
 
-            # 1. 处理主文档（正文、表格、文本框、超链接、修订记录等全部覆盖）
+            # 1. Process the main document (body, tables, text boxes, hyperlinks, revisions, etc. all covered)
             process_element_tree(doc.element.body)
 
-            # 2. 处理页眉页脚
+            # 2. Process headers and footers
             for section in doc.sections:
                 for hf in [section.header, section.footer,
                            section.first_page_header, section.first_page_footer,
@@ -641,7 +642,7 @@ class FileProcessor:
                     except Exception:
                         pass
 
-            # 3. 处理批注、脚注、尾注等关联部件
+            # 3. Process related parts such as comments, footnotes, and endnotes
             PART_REL_TYPES = [
                 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments',
                 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes',
@@ -664,25 +665,25 @@ class FileProcessor:
             return False
 
     def _extract_plain_text(self, file_path: str) -> str:
-        """从纯文本文件提取（自动尝试常见中文编码）"""
+        """Extract from a plain text file (auto-trying common Chinese encodings)"""
         for enc in ('utf-8-sig', 'utf-8', 'gbk', 'gb18030'):
             try:
                 with open(file_path, 'r', encoding=enc) as f:
                     return f.read()
             except UnicodeDecodeError:
                 continue
-        # 最终兜底：替换无法解码的字符
+        # Final fallback: replace characters that cannot be decoded
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             return f.read()
 
     def _extract_image_text(self, image_path: str, ocr_engine: str = 'rapidocr') -> str:
-        """从图片提取文本（OCR）"""
+        """Extract text from an image (OCR)"""
         if not HAS_OCR:
             raise ImportError(
-                "需要安装 OCR 依赖:\n"
-                "  推荐: pip install rapidocr pillow\n"
-                "  备选: pip install paddleocr paddlepaddle\n"
-                "  兜底: pip install pytesseract（需另装 tesseract 二进制）"
+                "OCR dependencies are required:\n"
+                "  Recommended: pip install rapidocr pillow\n"
+                "  Alternative: pip install paddleocr paddlepaddle\n"
+                "  Fallback: pip install pytesseract (also requires the tesseract binary)"
             )
 
         img = Image.open(image_path)
@@ -693,22 +694,22 @@ class FileProcessor:
         whitebox_only: bool = False,
     ) -> bool:
         """
-        PDF → PDF 原地脱敏（保留原 PDF 的全部格式：字体、排版、盖章、签名）
+        PDF -> PDF in-place redaction (preserves all formatting of the original PDF: fonts, layout, seals, signatures)
 
-        用 PyMuPDF 的 redact 机制：
-          1. 用 page.search_for 定位每个原始敏感文本的坐标框
-          2. add_redact_annot 在原位置覆盖为白底 + 占位符文字
-          3. apply_redactions 真正擦除
+        Uses PyMuPDF's redaction mechanism:
+          1. Locate each original sensitive text's coordinate box with page.search_for
+          2. add_redact_annot covers the original location with a white background + placeholder text
+          3. apply_redactions performs the actual erasure
 
-        中文字体处理：
-          - 优先用 "china-s"（PyMuPDF 内置简体）
-          - 失败回退系统 PingFang/STHeiti
-          - 最后兜底 helv（英文字体，会丢失中文占位符的字形）
+        Chinese font handling:
+          - Prefer "china-s" (PyMuPDF built-in Simplified Chinese)
+          - Fall back to system PingFang/STHeiti on failure
+          - Last-resort fallback helv (a Latin font, which loses the glyphs of Chinese placeholders)
 
         Args:
-            input_path: 源 PDF
-            output_path: 脱敏后 PDF
-            mapping: {(type, original): placeholder, ...}（与 TextMasker.mapping 结构相同）
+            input_path: source PDF
+            output_path: redacted PDF
+            mapping: {(type, original): placeholder, ...} (same structure as TextMasker.mapping)
         """
         if not HAS_PYMUPDF:
             return False
@@ -716,13 +717,13 @@ class FileProcessor:
         try:
             import fitz as _fitz
 
-            # 构建 original → masked 的替换字典，按长度降序避免子串问题
+            # Build the original -> masked replacement dict, descending length to avoid substring issues
             replacements = {}
             for (etype, original), masked in mapping.items():
                 if original and masked:
                     replacements[original] = masked
             if not replacements:
-                # 无实体则直接复制
+                # No entities: just copy
                 doc = _fitz.open(input_path)
                 doc.save(output_path)
                 doc.close()
@@ -730,16 +731,16 @@ class FileProcessor:
 
             sorted_originals = sorted(replacements.keys(), key=len, reverse=True)
 
-            # PyMuPDF 内置 china-s（简体）CJK 字体，无需 fontfile
+            # PyMuPDF's built-in china-s (Simplified) CJK font, no fontfile needed
             fontname = 'china-s'
 
             doc = _fitz.open(input_path)
 
             for page in doc:
-                # 构建字符级 bbox 映射：允许 entity 跨行匹配
+                # Build a character-level bbox map: allows entities to match across lines
                 flat_text, char_rects = self._build_char_map(page, _fitz)
 
-                # 取页面正文的中位字号（让占位符字号跟原文一致，不再小一截）
+                # Take the median font size of the page body (so placeholder size matches the original, no longer smaller)
                 page_font_sizes = []
                 try:
                     pd = page.get_text("dict")
@@ -757,7 +758,7 @@ class FileProcessor:
                     if page_font_sizes else 11
                 )
 
-                first_seen: set = set()  # 同一个 original 只替换一次占位符，余下清空
+                first_seen: set = set()  # write the placeholder only once per original, clear the rest
 
                 for original in sorted_originals:
                     masked = replacements[original]
@@ -767,16 +768,16 @@ class FileProcessor:
                     for occ_idx, rects in enumerate(occurrences):
                         if not rects:
                             continue
-                        # 多个 rect（跨行情况）：占位符只写在第一段；其余擦除
+                        # Multiple rects (cross-line case): write the placeholder only in the first segment; erase the rest
                         for ri, rect in enumerate(rects):
-                            # 轻微扩大 rect 以保证完全覆盖字形（字符 bbox 有时不含 descender）
+                            # Slightly enlarge the rect to fully cover the glyph (the char bbox sometimes omits the descender)
                             padded = _fitz.Rect(
                                 rect.x0 - 0.5, rect.y0 - 1.5,
                                 rect.x1 + 0.5, rect.y1 + 1.5,
                             )
-                            # 优先用页面正文的中位字号，兜底用 rect.height 估算
+                            # Prefer the page body's median font size, fall back to estimating from rect.height
                             fontsize = page_default_size
-                            # 如果原 rect 高度比页字号小很多（小字段），用 rect 估算更合适
+                            # If the original rect height is much smaller than the page font size (small fields), estimating from rect is better
                             est = rect.height * 0.85
                             if est < page_default_size * 0.7:
                                 fontsize = max(8, est)
@@ -790,24 +791,24 @@ class FileProcessor:
                                 align=_fitz.TEXT_ALIGN_LEFT,
                             )
 
-                # 应用 redaction。
-                #   images=PDF_REDACT_IMAGE_NONE → 不擦图片（保留盖章/签名）
-                #   graphics=PDF_REDACT_LINE_ART_NONE → 不擦线条（保留表格框线）
-                #   text=True → 擦除命中区的文字
+                # Apply redaction.
+                #   images=PDF_REDACT_IMAGE_NONE -> do not erase images (keep seals/signatures)
+                #   graphics=PDF_REDACT_LINE_ART_NONE -> do not erase line art (keep table borders)
+                #   text=True -> erase text in the matched areas
                 page.apply_redactions(
                     images=_fitz.PDF_REDACT_IMAGE_NONE,
                     graphics=_fitz.PDF_REDACT_LINE_ART_NONE,
                 )
 
-                # 收尾清扫：某些 PDF（如金格签章文件）有第二层文本，第一轮没擦到。
-                # 用 search_for 找残留，最多清扫 2 轮。
+                # Cleanup sweep: some PDFs (e.g. Jinge signature files) have a second text layer the first pass missed.
+                # Use search_for to find leftovers, sweeping at most 2 rounds.
                 for _ in range(2):
                     had_residue = False
                     for original in sorted_originals:
                         masked = replacements[original]
                         rects = page.search_for(original)
                         for r in rects:
-                            if r.width > 0.5:  # 跳过零宽度幽灵
+                            if r.width > 0.5:  # skip zero-width ghosts
                                 had_residue = True
                                 padded = _fitz.Rect(
                                     r.x0 - 0.5, r.y0 - 1.5,
@@ -841,12 +842,12 @@ class FileProcessor:
     @staticmethod
     def _build_char_map(page, _fitz):
         """
-        用 rawdict 取页面中每个字符的 bbox。
-        返回 (flat_text, char_rects)，两者一一对应；行尾追加 '\\n' 且 rect=None。
+        Use rawdict to get the bbox of every character on the page.
+        Returns (flat_text, char_rects), the two are one-to-one; a '\\n' is appended at each line end with rect=None.
 
-        关键：char bbox 的 y 坐标只覆盖 glyph 原点附近，会漏擦 ascender/descender。
-        这里把每个字符的 y 坐标扩展为所在 line 的完整 bbox y 范围，确保 apply_redactions
-        能把整个字形擦除干净。
+        Key point: a char bbox's y coordinates only cover near the glyph origin, which misses
+        erasing the ascender/descender. Here each character's y coordinate is extended to the full
+        bbox y range of its line, so apply_redactions erases the entire glyph cleanly.
         """
         raw = page.get_text("rawdict")
         flat = []
@@ -867,7 +868,7 @@ class FileProcessor:
                         if not c:
                             continue
                         if bbox and line_y0 is not None:
-                            # x 用 char 自己的，y 用 line 的（确保覆盖完整字形高度）
+                            # Use the char's own x, and the line's y (to cover the full glyph height)
                             r = _fitz.Rect(bbox[0], line_y0, bbox[2], line_y1)
                         elif bbox:
                             r = _fitz.Rect(bbox)
@@ -882,11 +883,11 @@ class FileProcessor:
     @staticmethod
     def _find_rects_for_entity(flat_text: str, char_rects: list, entity: str, _fitz):
         """
-        在 flat_text 中找 entity 的所有出现位置，允许中文/数字之间有 \\n（排版换行）。
-        返回 list of list：每个出现对应的 rect 列表（跨行则含多段）。
+        Find all occurrences of entity in flat_text, allowing a \\n (layout line break) between Chinese/digit characters.
+        Returns a list of lists: a rect list for each occurrence (multiple segments if it spans lines).
         """
         import re
-        # 为 entity 构造"容忍换行"的正则：在 CJK/数字字符之间允许插入一个 \n
+        # Build a "line-break tolerant" regex for entity: allow inserting one \n between CJK/digit characters
         def is_break_allowed(ch):
             return ('一' <= ch <= '鿿') or ch.isdigit() or ch.isalpha() or ch in ' \t'
 
@@ -926,26 +927,26 @@ class FileProcessor:
         ocr_engine: str = 'rapidocr', whitebox_only: bool = False,
     ) -> bool:
         """
-        扫描版 PDF 视觉脱敏（保留原页面图像，只把敏感字位置盖白底+占位符）
+        Visual redaction for scanned PDFs (keeps the original page image, only covers sensitive text positions with a white box + placeholder)
 
-        与 anonymize_pdf_inplace 的区别：
-          - 那个针对**文字层 PDF**：直接 redact 文字对象，保留所有原格式
-          - 这个针对**扫描版 PDF**：原"文字"是图像内容，需要先 OCR 拿到字符位置，
-            再用 PDF_REDACT_IMAGE_PIXELS 擦除底层图像并覆盖占位符
+        Difference from anonymize_pdf_inplace:
+          - That one targets **text-layer PDFs**: it redacts text objects directly, preserving all original formatting
+          - This one targets **scanned PDFs**: the original "text" is image content, so it must OCR first to get
+            character positions, then use PDF_REDACT_IMAGE_PIXELS to erase the underlying image and overlay the placeholder
 
-        效果：输出 PDF 看上去和原扫描版几乎一样（保留盖章/签名/页眉/纸张底色），
-        只有敏感字处变成白色色块上的 "[PERSON_1]" 等占位符。
+        Effect: the output PDF looks almost identical to the original scan (keeps seals/signatures/header/paper background),
+        only sensitive text becomes a "[PERSON_1]"-style placeholder on a white block.
 
         Args:
-            input_path: 源扫描 PDF
-            output_path: 输出脱敏后 PDF
-            mapping: TextMasker.mapping，{(etype, original): placeholder, ...}
-            ocr_engine: OCR 引擎，目前仅支持 'rapidocr'（PaddleOCR 不返回 box 数据）
+            input_path: source scanned PDF
+            output_path: output redacted PDF
+            mapping: TextMasker.mapping, {(etype, original): placeholder, ...}
+            ocr_engine: OCR engine, currently only 'rapidocr' is supported (PaddleOCR does not return box data)
         """
         if not HAS_PYMUPDF or not HAS_PIL:
             return False
         if not HAS_RAPIDOCR:
-            print("  ⚠️ 扫描版 PDF 视觉脱敏需要 RapidOCR，请安装：pip install rapidocr")
+            print("  ⚠️ Visual redaction of scanned PDFs requires RapidOCR, please install: pip install rapidocr")
             return False
 
         try:
@@ -953,7 +954,7 @@ class FileProcessor:
             import numpy as np
             import time as _time
 
-            # 保留 entity_type 信息（用于"独特识别部分"判断）
+            # Keep entity_type info (used for the "distinctive identifying part" judgment)
             replacements = {}
             entity_types = {}  # original -> type
             for (etype, original), masked in mapping.items():
@@ -961,13 +962,13 @@ class FileProcessor:
                     replacements[original] = masked
                     entity_types[original] = etype
             if not replacements:
-                # 无敏感实体则直接复制
+                # No sensitive entities: just copy
                 doc = _fitz.open(input_path)
                 doc.save(output_path)
                 doc.close()
                 return True
 
-            # 长串优先（避免 "张三" 先匹配到 "张三李四" 的子串）
+            # Longer strings first (avoid "张三" matching a substring of "张三李四")
             sorted_originals = sorted(replacements.keys(), key=len, reverse=True)
 
             doc = _fitz.open(input_path)
@@ -975,12 +976,12 @@ class FileProcessor:
             ocr = self._get_rapidocr()
             total_redacted = 0
 
-            print(f"[视觉脱敏] 共 {page_count} 页扫描版 PDF，正在逐页处理...", flush=True)
+            print(f"[Visual redaction] {page_count} scanned PDF pages total, processing page by page...", flush=True)
 
-            # 关键：用 PIL 直接在图像上画 redact，避免 PDF 旋转坐标转换问题
+            # Key: draw the redaction directly on the image with PIL, to avoid PDF rotation coordinate conversion issues
             from PIL import ImageDraw, ImageFont
 
-            # 找系统中文字体（用于在 PIL 上绘占位符）
+            # Find a system Chinese font (used to draw the placeholder on PIL)
             font_path = None
             for cand in (
                 '/System/Library/Fonts/PingFang.ttc',
@@ -994,13 +995,13 @@ class FileProcessor:
                     font_path = cand
                     break
 
-            # 输出新 PDF（每页用脱敏后的图像组装）
+            # Output new PDF (assemble each page from the redacted image)
             out_doc = _fitz.open()
 
             for page_num, page in enumerate(doc, 1):
                 t0 = _time.time()
 
-                # 渲染 200 DPI（用作输出的图像，质量优先）
+                # Render at 200 DPI (image used for output, quality first)
                 render_dpi = 200
                 scale = render_dpi / 72
                 mat = _fitz.Matrix(scale, scale)
@@ -1012,17 +1013,17 @@ class FileProcessor:
                 # OCR
                 result = ocr(img_array)
                 if not result or not result.txts or result.boxes is None:
-                    # 没识别到东西，原图直接放回
+                    # Nothing recognized, put the original image back as-is
                     new_page = out_doc.new_page(width=page.rect.width, height=page.rect.height)
                     img_bytes = _io_bytes_png(img)
                     new_page.insert_image(new_page.rect, stream=img_bytes)
-                    print(f"  第 {page_num}/{page_count} 页 OCR 无结果，原图放回", flush=True)
+                    print(f"  Page {page_num}/{page_count} had no OCR result, original image restored", flush=True)
                     continue
 
-                # 在 PIL 画布上作画
+                # Draw on the PIL canvas
                 draw = ImageDraw.Draw(img)
 
-                # 关键：按"视觉行"分组排序后再拼接，避免 OCR 把同一行拆成左右两段后顺序错乱
+                # Key: group and sort by "visual line" before joining, to avoid order scrambling when OCR splits one line into left/right segments
                 raw_lines = []
                 for li, (line_text, line_box) in enumerate(zip(result.txts, result.boxes)):
                     bxs = [float(p[0]) for p in line_box]
@@ -1035,7 +1036,7 @@ class FileProcessor:
                         'h': max(bys) - min(bys),
                     })
 
-                # 按 y_center 排，y 容差 = 平均行高 × 0.5 内视为同一视觉行
+                # Sort by y_center; within a y tolerance = average line height x 0.5, treat as the same visual line
                 raw_lines.sort(key=lambda L: L['y_center'])
                 avg_h = sum(L['h'] for L in raw_lines) / max(len(raw_lines), 1)
                 tolerance = max(avg_h * 0.5, 5)
@@ -1051,13 +1052,13 @@ class FileProcessor:
                     last_yc = L['y_center']
                 if cur_group:
                     groups.append(cur_group)
-                # 每组内按 x0 排序（左→右），组间已按 y 排好
+                # Within each group sort by x0 (left -> right); groups are already sorted by y
                 ordered_lines = []
                 for grp in groups:
                     grp.sort(key=lambda L: L['x0'])
                     ordered_lines.extend(grp)
 
-                # 跨行匹配用拼接文本
+                # Joined text used for cross-line matching
                 line_specs = []  # [(line_text, x0, x1, y0, y1, char_start_global)]
                 joined = ""
                 for L in ordered_lines:
@@ -1067,24 +1068,24 @@ class FileProcessor:
                     ))
                     joined += L['text']
 
-                # 全/半角等价规范化（OCR 容易把 ( 识为 (，反之亦然）
+                # Full-width/half-width equivalence normalization (OCR easily reads ( as (, and vice versa)
                 def normalize(s):
                     return s.translate(str.maketrans('()[]【】《》＜＞，。；：！？',
                                                        '()[]<><><>,.;:!?'))
                 joined_norm = normalize(joined)
 
-                # === 策略：每行单独匹配实体的子串（避免依赖跨行拼接顺序）===
-                # 对每个实体：遍历 OCR 每一行，找该行中包含的实体的最长子串。
-                # 这样无论 OCR 怎么切分（横切、竖切、左右分段），任何在该行可见的
-                # 实体片段都会被遮住，且 OCR 错位 / 顺序乱不影响结果。
+                # === Strategy: match entity substrings per line (avoid relying on cross-line join order) ===
+                # For each entity: iterate over every OCR line and find the longest substring of the entity in that line.
+                # This way, no matter how OCR splits things (horizontal cut, vertical cut, left/right segments), any
+                # entity fragment visible in that line gets covered, and OCR misalignment / scrambled order does not affect the result.
                 page_redacted = 0
-                # 每行已遮区间 [(line_idx, char_start, char_end), ...]
+                # Already-covered intervals per line [(line_idx, char_start, char_end), ...]
                 line_handled = {i: [] for i in range(len(line_specs))}
-                # 哪些实体已经写过占位符（避免在多行重复写 [PERSON_1]）
+                # Which entities have already had a placeholder written (avoid repeating [PERSON_1] across lines)
                 placeholder_written = set()
 
                 def longest_common_substring(a, b, min_len=2):
-                    """在 b 中找 a 的最长子串。返回 (a_start, b_start, length) 或 None"""
+                    """Find the longest substring of a within b. Returns (a_start, b_start, length) or None"""
                     for L in range(min(len(a), len(b)), min_len - 1, -1):
                         for i in range(len(a) - L + 1):
                             sub = a[i:i + L]
@@ -1094,15 +1095,15 @@ class FileProcessor:
                     return None
 
                 def char_width_weight(c):
-                    """估算字符宽度权重：CJK = 2，半角 = 1"""
+                    """Estimate character width weight: CJK = 2, half-width = 1"""
                     if '一' <= c <= '鿿':
-                        return 2.0  # CJK 汉字
+                        return 2.0  # CJK character
                     if '　' <= c <= '〿' or '＀' <= c <= '￯':
-                        return 2.0  # CJK 标点 / 全角
-                    return 1.0  # 半角 ASCII / 数字 / 标点
+                        return 2.0  # CJK punctuation / full-width
+                    return 1.0  # half-width ASCII / digit / punctuation
 
                 def pixel_offset_in_line(text, char_idx, line_x0, line_w):
-                    """按 CJK 双倍宽权重，从 char_idx 字符位置算到像素 X"""
+                    """Using CJK double-width weights, compute pixel X from the char_idx character position"""
                     if not text:
                         return line_x0
                     weights = [char_width_weight(c) for c in text]
@@ -1113,18 +1114,18 @@ class FileProcessor:
                     return line_x0 + (cum / total) * line_w
 
                 def get_distinctive_part(entity, etype):
-                    """提取实体里的'品牌/独特识别部分'，去掉通用前后缀"""
+                    """Extract the 'brand/distinctive identifying part' of an entity, dropping generic prefixes/suffixes"""
                     import re as _re
                     if etype in ('company', 'law_firm', 'institution', 'bank_name'):
-                        # 移除括号内容（含中英文括号）
+                        # Remove parenthesized content (both Chinese and Latin parentheses)
                         s = _re.sub(r'[（(].*?[)）]', '', entity)
-                        # 移除常见地名前缀
+                        # Remove common place-name prefixes
                         for p in ('北京', '上海', '广东省', '广州市', '深圳市', '深圳', '广州',
                                   '中国', '中华人民共和国', '中华', '广东', '浙江省', '浙江',
                                   '江苏省', '山东省', '河北省', '河南省'):
                             if s.startswith(p):
                                 s = s[len(p):]
-                        # 移除常见后缀（长后缀优先）
+                        # Remove common suffixes (longer suffixes first)
                         for sfx in sorted([
                             '律师事务所', '会计师事务所', '事务所',
                             '股份有限公司', '有限责任公司', '有限公司',
@@ -1149,7 +1150,7 @@ class FileProcessor:
                                 core = entity[:-len(sfx)]
                                 return core if len(core) >= 2 else None
                         return entity
-                    # 人名/案号/信用代码 等：本身就是独特的
+                    # Person names / case numbers / credit codes, etc.: distinctive on their own
                     return entity
 
                 for original in sorted_originals:
@@ -1159,26 +1160,26 @@ class FileProcessor:
                     if len(orig_norm) < 2:
                         continue
 
-                    # 数字/英文实体不要短匹配（容易误报）；中文最少 3 字以避免"公司"/"国际"等通用词误中
+                    # Do not short-match digit/Latin entities (prone to false positives); require at least 3 Chinese chars to avoid generic words like "公司"/"国际"
                     is_alnum = orig_norm.replace('.', '').replace('-', '').isalnum() and \
                                all(ord(c) < 128 for c in orig_norm)
                     if is_alnum:
                         min_match_len = 4
                     elif len(orig_norm) <= 3:
-                        # 实体本身就只 2-3 字（人名/品牌）：必须完整匹配
+                        # The entity itself is only 2-3 chars (person name/brand): must match in full
                         min_match_len = len(orig_norm)
                     else:
-                        # 长实体（4+ 字）：最少 3 字（避免"公司"等通用词误中，但 OCR 碎片化时仍能命中）
+                        # Long entity (4+ chars): minimum 3 chars (avoid generic words like "公司" matching, but still hit when OCR fragments)
                         min_match_len = 3
 
-                    # 计算"独特识别部分"（如 "北京XX（深圳）律师事务所" → "XX"）
+                    # Compute the "distinctive identifying part" (e.g. "北京XX（深圳）律师事务所" -> "XX")
                     distinctive = get_distinctive_part(original, etype)
                     distinctive_norm = normalize(distinctive) if distinctive else None
 
-                    # 找出含"独特部分"的行（这些行 100% 是真命中），它们的 y_center 用来圈定"同一视觉行"
+                    # Find lines containing the "distinctive part" (those are 100% true hits); their y_center is used to delimit the "same visual line"
                     distinctive_y_centers = []
                     if distinctive_norm and distinctive_norm != orig_norm:
-                        # 实体本身有独特部分（即名字含通用后缀）
+                        # The entity itself has a distinctive part (i.e. the name contains a generic suffix)
                         for spec in line_specs:
                             lt_norm = normalize(spec[0])
                             if distinctive_norm in lt_norm:
@@ -1198,9 +1199,9 @@ class FileProcessor:
                         local_e = local_s + length
                         ent_end = ent_start + length
 
-                        # 反误报关卡：
-                        # 如果实体有独特部分（如公司有品牌名），且当前行不含独特部分，
-                        # 则该行必须与某个含独特部分的行在同一视觉行（y 相近）才允许 redact
+                        # Anti-false-positive gate:
+                        # If the entity has a distinctive part (e.g. a company has a brand name) and the current line lacks that distinctive part,
+                        # then this line must be on the same visual line (close y) as some line containing the distinctive part before redacting is allowed
                         if distinctive_y_centers:
                             line_has_distinctive = distinctive_norm in lt_norm
                             if not line_has_distinctive:
@@ -1210,15 +1211,15 @@ class FileProcessor:
                                     for dyc, _ in distinctive_y_centers
                                 )
                                 if not same_row:
-                                    continue  # 跳过：通用部分在不相干的行里出现，是误报
+                                    continue  # skip: the generic part appearing in an unrelated line is a false positive
 
-                        # 重叠检查
+                        # Overlap check
                         if any(s < local_e and local_s < e for s, e in line_handled[li]):
                             continue
                         line_handled[li].append((local_s, local_e))
 
                         line_w = max(lx1 - lx0, 1)
-                        # 用 CJK 双倍宽权重精确算位置（避免英中混排时位置偏移）
+                        # Compute the position precisely with CJK double-width weights (avoids offset in mixed Chinese/English text)
                         sub_x0 = pixel_offset_in_line(lt, local_s, lx0, line_w)
                         sub_x1 = pixel_offset_in_line(lt, local_e, lx0, line_w)
 
@@ -1233,26 +1234,26 @@ class FileProcessor:
                             fill="white", outline=None,
                         )
 
-                        # 决定该段写什么文字：
-                        #   - whitebox_only：强制不写任何文字，纯白框
-                        #   - partial 掩码（mask 长度 == 实体长度）：写本行对应的切片（如"张*"）
-                        #     这种掩码本身就有信息（"张*"显示有姓但不显示名），保留
-                        #   - 占位符模式（如 [PERSON_1] / <人物1> / 〔姓名1〕）：在白框中央写完整占位符
+                        # Decide what text to write in this segment:
+                        #   - whitebox_only: force no text, a pure white box
+                        #   - partial mask (mask length == entity length): write the slice for this line (e.g. "张*")
+                        #     such a mask carries information itself ("张*" shows there is a surname but hides the given name), keep it
+                        #   - placeholder mode (e.g. [PERSON_1] / <人物1> / 〔姓名1〕): write the full placeholder centered in the white box
                         if whitebox_only:
                             text_to_draw = ''
                         else:
                             same_length = len(masked) == len(orig_norm)
                             if same_length:
-                                # partial 模式：本行只画对应切片
+                                # partial mode: this line only draws the corresponding slice
                                 text_to_draw = masked[ent_start:ent_end]
                             else:
-                                # 占位符模式：每个出现都画完整占位符（哪怕跨行也各画一份）
+                                # placeholder mode: draw the full placeholder for each occurrence (one per line even across lines)
                                 text_to_draw = masked
 
                         if text_to_draw:
                             line_h = ly1 - ly0
                             avail_w = rect_x1 - rect_x0
-                            # 自适应字号：从行高 0.75 起，逐步缩小直到文字宽度 ≤ 95% 可用宽度
+                            # Adaptive font size: start at 0.75 of line height, shrink gradually until text width <= 95% of available width
                             font_size = max(10, int(line_h * 0.75))
                             font = None
                             text_w = text_h = 0
@@ -1279,16 +1280,16 @@ class FileProcessor:
 
                         page_redacted += 1
 
-                # 把绘制完成的图像作为新页面背景
+                # Use the finished image as the new page background
                 new_page = out_doc.new_page(width=page.rect.width, height=page.rect.height)
                 img_bytes = _io_bytes_png(img)
                 new_page.insert_image(new_page.rect, stream=img_bytes)
 
                 total_redacted += page_redacted
                 elapsed = _time.time() - t0
-                print(f"  第 {page_num}/{page_count} 页：脱敏 {page_redacted} 处，耗时 {elapsed:.1f}s", flush=True)
+                print(f"  Page {page_num}/{page_count}: redacted {page_redacted} item(s), took {elapsed:.1f}s", flush=True)
 
-            print(f"[视觉脱敏] 完成，共脱敏 {total_redacted} 处", flush=True)
+            print(f"[Visual redaction] Done, redacted {total_redacted} item(s) in total", flush=True)
 
             out_doc.save(output_path, deflate=True, garbage=3)
             out_doc.close()
@@ -1301,15 +1302,15 @@ class FileProcessor:
 
     def write_file(self, text: str, output_path: str, output_format: str = 'auto') -> List[Tuple[str, str]]:
         """
-        写入文件
+        Write a file
 
         Args:
-            text: 文本内容
-            output_path: 输出文件路径
-            output_format: 输出格式 (auto, txt, md, pdf, docx)
+            text: text content
+            output_path: output file path
+            output_format: output format (auto, txt, md, pdf, docx)
 
         Returns:
-            列表 [(文件类型, 文件路径), ...]
+            a list [(file_type, file_path), ...]
         """
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1324,7 +1325,7 @@ class FileProcessor:
             if self._write_pdf(text, str(pdf_path)):
                 saved_files.append(('output_pdf', str(pdf_path)))
             else:
-                # PDF生成失败，回退到文本
+                # PDF generation failed, fall back to text
                 txt_path = path.with_suffix('.txt')
                 self._write_plain_text(text, str(txt_path))
                 saved_files.append(('output_txt', str(txt_path)))
@@ -1351,7 +1352,7 @@ class FileProcessor:
         return saved_files
 
     def _guess_format(self, path: Path) -> str:
-        """根据文件扩展名猜测格式"""
+        """Guess the format from the file extension"""
         suffix = path.suffix.lower()
         if suffix == '.pdf' and (HAS_REPORTLAB or HAS_PYMUPDF):
             return 'pdf'
@@ -1363,7 +1364,7 @@ class FileProcessor:
             return 'txt'
 
     def _write_plain_text(self, text: str, file_path: str) -> bool:
-        """写入纯文本文件"""
+        """Write a plain text file"""
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(text)
@@ -1372,7 +1373,7 @@ class FileProcessor:
             return False
 
     def _write_pdf(self, text: str, file_path: str) -> bool:
-        """写入PDF文件"""
+        """Write a PDF file"""
         if HAS_REPORTLAB:
             try:
                 return self._write_pdf_reportlab(text, file_path)
@@ -1388,7 +1389,7 @@ class FileProcessor:
         return False
 
     def _write_pdf_reportlab(self, text: str, file_path: str) -> bool:
-        """使用 reportlab 创建 PDF"""
+        """Create a PDF using reportlab"""
         import platform
         import os
 
@@ -1397,8 +1398,8 @@ class FileProcessor:
                                 topMargin=50, bottomMargin=50)
         story = []
 
-        # 回退模板：仿宋 小四 1.5 倍行距
-        # 小四 = 12pt，1.5x = 18pt leading
+        # Fallback template: FangSong, Small Four, 1.5 line spacing
+        # Small Four = 12pt, 1.5x = 18pt leading
         styles = getSampleStyleSheet()
         normal_style = ParagraphStyle(
             'Normal',
@@ -1410,11 +1411,11 @@ class FileProcessor:
             spaceAfter=0,
         )
 
-        # 尝试加载中文字体（支持 macOS / Windows / Linux）
+        # Try loading a Chinese font (supports macOS / Windows / Linux)
         font_loaded = False
         font_paths = []
         if platform.system() == 'Darwin':
-            # macOS 优先用仿宋类（Kaiti/STFangsong），否则回退 PingFang
+            # macOS prefers FangSong-style fonts (Kaiti/STFangsong), otherwise falls back to PingFang
             font_paths = [
                 '/System/Library/Fonts/Supplemental/Songti.ttc',
                 '/System/Library/Fonts/STHeiti Light.ttc',
@@ -1424,11 +1425,11 @@ class FileProcessor:
         elif platform.system() == 'Windows':
             windir = os.environ.get('WINDIR', 'C:\\Windows')
             font_paths = [
-                os.path.join(windir, 'Fonts', 'simfang.ttf'),   # 仿宋 ⭐优先
-                os.path.join(windir, 'Fonts', 'simsun.ttc'),    # 宋体
-                os.path.join(windir, 'Fonts', 'msyh.ttc'),      # 微软雅黑
-                os.path.join(windir, 'Fonts', 'simhei.ttf'),    # 黑体
-                os.path.join(windir, 'Fonts', 'msyhbd.ttc'),    # 微软雅黑粗体
+                os.path.join(windir, 'Fonts', 'simfang.ttf'),   # FangSong, preferred
+                os.path.join(windir, 'Fonts', 'simsun.ttc'),    # SimSun
+                os.path.join(windir, 'Fonts', 'msyh.ttc'),      # Microsoft YaHei
+                os.path.join(windir, 'Fonts', 'simhei.ttf'),    # SimHei
+                os.path.join(windir, 'Fonts', 'msyhbd.ttc'),    # Microsoft YaHei Bold
             ]
         else:  # Linux
             font_paths = [
@@ -1462,7 +1463,7 @@ class FileProcessor:
         return True
 
     def _write_pdf_fitz(self, text: str, file_path: str) -> bool:
-        """使用 PyMuPDF 创建 PDF（降级方案，支持中文）"""
+        """Create a PDF using PyMuPDF (fallback option, supports Chinese)"""
         import os
 
         doc = fitz.open()
@@ -1473,11 +1474,11 @@ class FileProcessor:
         page_width = 595
         max_y = page_height - margin
 
-        # 尝试加载中文字体
+        # Try loading a Chinese font
         font_path = None
         font_name = "helv"
 
-        # 跨平台中文字体搜索
+        # Cross-platform Chinese font search
         import platform as _plat
         candidate_fonts = [
             # macOS
@@ -1490,7 +1491,7 @@ class FileProcessor:
             '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
             '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
         ]
-        # Windows 字体
+        # Windows fonts
         if _plat.system() == 'Windows':
             windir = os.environ.get('WINDIR', 'C:\\Windows')
             candidate_fonts = [
@@ -1508,7 +1509,7 @@ class FileProcessor:
         current_y = margin
 
         if font_path:
-            # 使用外部中文字体
+            # Use an external Chinese font
             page.insert_font(fontname="cjk", fontfile=font_path)
             font_name = "cjk"
 
@@ -1527,7 +1528,7 @@ class FileProcessor:
                         fontsize=font_size, fontname=font_name
                     )
                 except Exception:
-                    # 最终降级：ASCII only
+                    # Final fallback: ASCII only
                     safe_line = ''.join([c if ord(c) < 128 else '?' for c in line])
                     page.insert_text(
                         (margin, current_y), safe_line,
@@ -1542,13 +1543,13 @@ class FileProcessor:
 
     def _write_docx(self, text: str, file_path: str) -> bool:
         """
-        写入 Word 文档 — 回退模板（仿宋 / 小四 / 1.5 倍行距）
+        Write a Word document - fallback template (FangSong / Small Four / 1.5 line spacing)
 
-        格式规范：
-        - 字体：仿宋（中英文统一）
-        - 正文：小四（12pt），行间距 1.5 倍，段前段后 0
-        - 标题：小三（15pt）加粗，段前段后 0.5 行
-        - 页边距：上 3.7cm 下 3.5cm 左 2.8cm 右 2.6cm
+        Formatting spec:
+        - Font: FangSong (uniform for Chinese and English)
+        - Body: Small Four (12pt), 1.5 line spacing, 0 space before/after
+        - Headings: Small Three (15pt) bold, 0.5 line space before/after
+        - Margins: top 3.7cm, bottom 3.5cm, left 2.8cm, right 2.6cm
         """
         if not HAS_DOCX:
             return False
@@ -1560,14 +1561,14 @@ class FileProcessor:
             import re as _re
 
             FONT_NAME = '仿宋'
-            BODY_SIZE = Pt(12)       # 小四 = 12pt
-            TITLE_SIZE = Pt(15)      # 小三 = 15pt
-            LINE_SPACING = 1.5       # 1.5 倍行距
-            TITLE_SPACE = Pt(6)      # 0.5 行 ≈ 6pt（基于 12pt 正文）
+            BODY_SIZE = Pt(12)       # Small Four = 12pt
+            TITLE_SIZE = Pt(15)      # Small Three = 15pt
+            LINE_SPACING = 1.5       # 1.5 line spacing
+            TITLE_SPACE = Pt(6)      # 0.5 line ~ 6pt (based on 12pt body)
 
             doc = Document()
 
-            # 页边距
+            # Margins
             for section in doc.sections:
                 section.top_margin = Cm(3.7)
                 section.bottom_margin = Cm(3.5)
@@ -1575,7 +1576,7 @@ class FileProcessor:
                 section.right_margin = Cm(2.6)
 
             def _set_rfonts_on_element(element):
-                """为 XML 元素设置仿宋字体"""
+                """Set the FangSong font on an XML element"""
                 rPr = element.find(qn('w:rPr'))
                 if rPr is None:
                     rPr = OxmlElement('w:rPr')
@@ -1586,7 +1587,7 @@ class FileProcessor:
                     rPr.append(rFonts)
                 for attr in ('w:eastAsia', 'w:ascii', 'w:hAnsi', 'w:cs'):
                     rFonts.set(qn(attr), FONT_NAME)
-                # 清除主题字体覆盖
+                # Clear theme font overrides
                 for theme_attr in ('w:eastAsiaTheme', 'w:asciiTheme', 'w:hAnsiTheme', 'w:cstheme'):
                     try:
                         del rFonts.attrib[qn(theme_attr)]
@@ -1594,17 +1595,17 @@ class FileProcessor:
                         pass
 
             def _set_line_spacing(para, spacing, rule=WD_LINE_SPACING.MULTIPLE):
-                """设置段落行间距（默认 1.5 倍多行间距）"""
+                """Set paragraph line spacing (default 1.5x multiple line spacing)"""
                 pf = para.paragraph_format
                 pf.line_spacing_rule = rule
                 pf.line_spacing = spacing
 
             def _is_title(line):
-                """判断是否为标题行（仅匹配文书名称和章节标题）"""
+                """Determine whether a line is a heading (matches only document names and section headings)"""
                 stripped = line.strip()
                 if not stripped or len(stripped) > 25:
                     return False
-                # 文书名称（必须是独立的短标题）
+                # Document names (must be standalone short titles)
                 doc_titles = [
                     r'^(?:民事|刑事|行政)?(?:起诉状|答辩状|上诉状|代理意见|判决书|裁定书|调解书|决定书|申请书|异议书)$',
                     r'^(?:关于.+的(?:函|通知|公告|意见|决定|报告|说明|声明|承诺书))$',
@@ -1613,7 +1614,7 @@ class FileProcessor:
                 for pat in doc_titles:
                     if _re.search(pat, stripped):
                         return True
-                # 章节标题（"诉讼请求" "事实与理由" 等独立短行）
+                # Section headings (standalone short lines like "诉讼请求", "事实与理由")
                 section_titles = [
                     r'^(?:诉讼请求|事实与理由|证据清单|判决如下|本院认为|裁判结果|审理查明)$',
                     r'^第[一二三四五六七八九十\d]+[章节部分](?:\s|$)',
@@ -1623,7 +1624,7 @@ class FileProcessor:
                         return True
                 return False
 
-            # 设置 Normal 样式默认值
+            # Set Normal style defaults
             normal_style = doc.styles['Normal']
             normal_style.font.name = FONT_NAME
             normal_style.font.size = BODY_SIZE
@@ -1634,7 +1635,7 @@ class FileProcessor:
             normal_pf.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
             normal_pf.line_spacing = LINE_SPACING
 
-            # 设置 docDefaults
+            # Set docDefaults
             styles_element = doc.styles.element
             rPrDefault = styles_element.find(qn('w:docDefaults'))
             if rPrDefault is None:
@@ -1665,16 +1666,16 @@ class FileProcessor:
                 rPr.append(szCs)
             szCs.set(qn('w:val'), '24')
 
-            # 清洗：去掉 XML 不允许的控制字符（OCR 结果常见）
-            # 只保留 \t \n \r 和 printable，丢弃其它 C0 控制字符
+            # Cleanup: strip control characters not allowed in XML (common in OCR results)
+            # Keep only \t \n \r and printable characters, drop other C0 control characters
             import re as _re
             text = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
 
-            # 处理文本内容
+            # Process the text content
             lines = text.split('\n')
             for line in lines:
                 stripped = line.strip()
-                # 跳过页面分隔标记
+                # Skip page separator markers
                 if stripped.startswith('=' * 10):
                     continue
                 if stripped.startswith('第 ') and stripped.endswith(' 页'):
@@ -1697,7 +1698,7 @@ class FileProcessor:
                         run.font.size = BODY_SIZE
                     _set_line_spacing(para, LINE_SPACING)
                 else:
-                    # 空行：保持格式一致
+                    # Empty line: keep formatting consistent
                     para = doc.add_paragraph()
                     _set_rfonts_on_element(para._element)
                     _set_line_spacing(para, LINE_SPACING)
@@ -1710,14 +1711,14 @@ class FileProcessor:
             return False
 
     def write_mapping(self, mapping: Dict, file_path: str):
-        """写入映射表"""
+        """Write the mapping table"""
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(mapping, f, ensure_ascii=False, indent=2)
 
     def get_supported_input_formats(self) -> List[str]:
-        """获取支持的输入格式"""
+        """Get the supported input formats"""
         return self.supported_formats['input'].copy()
 
     def get_supported_output_formats(self) -> List[str]:
-        """获取支持的输出格式"""
+        """Get the supported output formats"""
         return self.supported_formats['output'].copy()

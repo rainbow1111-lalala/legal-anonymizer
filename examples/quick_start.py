@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-快速开始示例 - 法律文档脱敏工具
+Quick start examples - Legal Document Anonymizer.
 """
 
 import sys
 from pathlib import Path
 
-# 添加父目录到路径
+# Add the parent directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from anonymizer import LegalAnonymizer
 
 
 def example_1_basic_text():
-    """示例1: 基本文本脱敏"""
+    """Example 1: basic text redaction."""
     print("=" * 60)
-    print("示例1: 基本文本脱敏")
+    print("Example 1: basic text redaction")
     print("=" * 60)
 
     anonymizer = LegalAnonymizer()
@@ -26,17 +26,17 @@ def example_1_basic_text():
 邮箱是zhangsan@example.com。
     """.strip()
 
-    print("\n原始文本:")
+    print("\nOriginal text:")
     print("-" * 60)
     print(text)
 
     anonymized, mapping = anonymizer.anonymize_text(text)
 
-    print("\n\n脱敏后:")
+    print("\n\nAfter redaction:")
     print("-" * 60)
     print(anonymized)
 
-    print("\n\n映射表:")
+    print("\n\nMapping table:")
     print("-" * 60)
     for placeholder, info in mapping.items():
         print(f"{placeholder} -> {info['original']} ({info['type']})")
@@ -45,14 +45,14 @@ def example_1_basic_text():
 
 
 def example_2_custom_entities():
-    """示例2: 使用自定义实体"""
+    """Example 2: using custom entities."""
     print("=" * 60)
-    print("示例2: 使用自定义实体")
+    print("Example 2: using custom entities")
     print("=" * 60)
 
     anonymizer = LegalAnonymizer()
 
-    # 添加自定义实体
+    # Add custom entities
     anonymizer.add_custom_entity("person", "张三")
     anonymizer.add_custom_entity("person", "李四")
     anonymizer.add_custom_entity("company", "北京示例科技有限公司")
@@ -66,13 +66,13 @@ def example_2_custom_entities():
 与北京市某某律师事务所签订了合同。
     """.strip()
 
-    print("\n原始文本:")
+    print("\nOriginal text:")
     print("-" * 60)
     print(text)
 
     anonymized, mapping = anonymizer.anonymize_text(text)
 
-    print("\n\n脱敏后:")
+    print("\n\nAfter redaction:")
     print("-" * 60)
     print(anonymized)
 
@@ -80,14 +80,14 @@ def example_2_custom_entities():
 
 
 def example_3_partial_masking():
-    """示例3: 部分掩码策略"""
+    """Example 3: partial masking strategy."""
     print("=" * 60)
-    print("示例3: 部分掩码策略（保留部分信息）")
+    print("Example 3: partial masking strategy (keep some information)")
     print("=" * 60)
 
     anonymizer = LegalAnonymizer()
 
-    # 设置部分掩码策略
+    # Set the partial masking strategy
     anonymizer.set_mask_strategy("id_card", "partial")
     anonymizer.set_mask_strategy("phone", "partial")
     anonymizer.set_mask_strategy("email", "partial")
@@ -100,13 +100,13 @@ def example_3_partial_masking():
 银行卡号：6222021234567890123
     """.strip()
 
-    print("\n原始文本:")
+    print("\nOriginal text:")
     print("-" * 60)
     print(text)
 
     anonymized, mapping = anonymizer.anonymize_text(text)
 
-    print("\n\n脱敏后（部分掩码）:")
+    print("\n\nAfter redaction (partial masking):")
     print("-" * 60)
     print(anonymized)
 
@@ -114,9 +114,9 @@ def example_3_partial_masking():
 
 
 def example_4_analyze():
-    """示例4: 分析文档（不实际脱敏）"""
+    """Example 4: analyze a document (without actually redacting)."""
     print("=" * 60)
-    print("示例4: 分析文档中的敏感信息")
+    print("Example 4: analyze sensitive information in a document")
     print("=" * 60)
 
     anonymizer = LegalAnonymizer()
@@ -130,51 +130,51 @@ def example_4_analyze():
 
     analysis = anonymizer.analyze_text(text)
 
-    print(f"\n发现 {analysis['total_findings']} 处敏感信息")
-    print(f"涉及 {analysis['type_count']} 种类型\n")
+    print(f"\nFound {analysis['total_findings']} items of sensitive information")
+    print(f"Across {analysis['type_count']} types\n")
 
     for entity_type, examples in analysis['findings'].items():
-        print(f"【{entity_type}】({len(examples)} 个):")
+        print(f"[{entity_type}] ({len(examples)} item(s)):")
         for example in examples:
             print(f"  - {example}")
         print()
 
 
 def example_5_file_processing():
-    """示例5: 文件处理"""
+    """Example 5: file processing."""
     print("=" * 60)
-    print("示例5: 文件处理")
+    print("Example 5: file processing")
     print("=" * 60)
 
     sample_file = Path(__file__).parent / "sample.txt"
 
     if not sample_file.exists():
-        print(f"示例文件不存在: {sample_file}")
+        print(f"Sample file not found: {sample_file}")
         return
 
     anonymizer = LegalAnonymizer()
 
-    # 添加自定义实体
+    # Add custom entities
     entities_file = Path(__file__).parent / "sample_entities.json"
     anonymizer.load_entities_from_file(str(entities_file))
 
-    # 分析文件
-    print("\n[1/3] 分析文件...")
+    # Analyze the file
+    print("\n[1/3] Analyzing the file...")
     analysis_result = anonymizer.analyze_file(str(sample_file))
 
     if 'error' in analysis_result:
-        print(f"错误: {analysis_result['error']}")
+        print(f"Error: {analysis_result['error']}")
         return
 
     analysis = analysis_result['result']['analysis']
-    print(f"  发现 {analysis['total_findings']} 处敏感信息")
+    print(f"  Found {analysis['total_findings']} items of sensitive information")
 
-    # 脱敏文件
-    print("\n[2/3] 脱敏文件...")
+    # Redact the file
+    print("\n[2/3] Redacting the file...")
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
 
-    # 先使用占位符策略
+    # First use the placeholder strategy
     result = anonymizer.anonymize_file(
         str(sample_file),
         str(output_dir / "sample_anonymized.txt"),
@@ -183,18 +183,18 @@ def example_5_file_processing():
     )
 
     if 'error' in result:
-        print(f"错误: {result['error']}")
+        print(f"Error: {result['error']}")
         return
 
     r = result['result']
-    print(f"  替换了 {r['replacements_made']} 处")
+    print(f"  Made {r['replacements_made']} replacements")
 
-    # 再使用部分掩码策略
-    print("\n[3/3] 使用部分掩码策略...")
+    # Then use the partial masking strategy
+    print("\n[3/3] Using the partial masking strategy...")
     anonymizer.reset()
     anonymizer.load_entities_from_file(str(entities_file))
 
-    # 设置部分掩码
+    # Set partial masking
     partial_types = ['id_card', 'phone', 'fax', 'toll_free', 'bank_account',
                    'email', 'passport', 'credit_code', 'license_plate']
     for etype in partial_types:
@@ -207,24 +207,24 @@ def example_5_file_processing():
         save_mapping=True
     )
 
-    print("\n完成！输出文件:")
+    print("\nDone. Output files:")
     print(f"  - {output_dir / 'sample_anonymized.txt'}")
     print(f"  - {output_dir / 'sample_partial_masked.txt'}")
     print()
 
 
 def main():
-    """运行所有示例"""
+    """Run all examples."""
     print("\n" + "=" * 60)
-    print("法律文档脱敏工具 - 快速开始示例")
+    print("Legal Document Anonymizer - Quick start examples")
     print("=" * 60)
 
     examples = [
-        ("基本文本脱敏", example_1_basic_text),
-        ("自定义实体", example_2_custom_entities),
-        ("部分掩码策略", example_3_partial_masking),
-        ("分析文档", example_4_analyze),
-        ("文件处理", example_5_file_processing),
+        ("Basic text redaction", example_1_basic_text),
+        ("Custom entities", example_2_custom_entities),
+        ("Partial masking strategy", example_3_partial_masking),
+        ("Analyze a document", example_4_analyze),
+        ("File processing", example_5_file_processing),
     ]
 
     for i, (name, func) in enumerate(examples, 1):
@@ -232,15 +232,15 @@ def main():
         try:
             func()
         except Exception as e:
-            print(f"示例执行出错: {e}")
+            print(f"Example failed: {e}")
             import traceback
             traceback.print_exc()
 
         print()
-        input("按 Enter 继续下一个示例...")
+        input("Press Enter to continue to the next example...")
 
     print("\n" + "=" * 60)
-    print("所有示例完成！")
+    print("All examples complete.")
     print("=" * 60)
 
 

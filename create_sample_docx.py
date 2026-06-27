@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-创建示例Word文档
+Create a sample Word document.
 """
 
 from pathlib import Path
@@ -13,26 +13,26 @@ try:
     from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
 except ImportError:
-    print("请先安装 python-docx: pip install python-docx")
+    print("Please install python-docx first: pip install python-docx")
     sys.exit(1)
 
-# 创建文档
+# Create the document
 doc = Document()
 
-# 标题
+# Title
 title = doc.add_heading('法律意见书示例', 0)
 title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 doc.add_paragraph()
 
-# 收件人
+# Recipient
 p = doc.add_paragraph()
 p.add_run('致：').bold = True
 p.add_run('北京示例科技有限公司')
 
 doc.add_paragraph()
 
-# 正文
+# Body
 doc.add_heading('一、当事人信息', level=1)
 
 doc.add_paragraph('1. 公司基本情况')
@@ -92,8 +92,8 @@ p = doc.add_paragraph()
 p.add_run('- 本意见书出具日期：').bold = True
 p.add_run('2026年2月27日')
 
-# 保存文档
+# Save the document
 output_path = Path(__file__).parent / 'examples' / 'sample.docx'
 doc.save(str(output_path))
 
-print(f"示例Word文档已创建: {output_path}")
+print(f"Sample Word document created: {output_path}")

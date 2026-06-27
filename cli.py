@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Legal Document Anonymizer - CLI Interface
-法律文档脱敏工具 - 命令行接口
+Legal Anonymizer - command-line interface
 
 Usage:
     python cli.py anonymize input.pdf -o output.pdf
@@ -19,7 +19,7 @@ from anonymizer import LegalAnonymizer
 
 
 def load_entities_from_file(file_path: str) -> List[Dict]:
-    """从文件加载自定义实体"""
+    """Load custom entities from a file."""
     path = Path(file_path)
     if not path.exists():
         return []
@@ -29,49 +29,49 @@ def load_entities_from_file(file_path: str) -> List[Dict]:
 
 
 def print_result_summary(result: Dict, quiet: bool = False):
-    """打印结果摘要"""
+    """Print a summary of the result."""
     if 'error' in result:
         if not quiet:
-            print(f"❌ 错误: {result['error']}", file=sys.stderr)
+            print(f"❌ Error: {result['error']}", file=sys.stderr)
         return
 
     r = result['result']
 
     if not quiet:
         print("\n" + "=" * 60)
-        print("✅ 处理完成")
+        print("✅ Processing complete")
         print("=" * 60)
 
         analysis = r.get('analysis', {})
-        print(f"\n📊 分析统计:")
-        print(f"  发现的敏感信息类型: {analysis.get('type_count', 0)} 种")
-        print(f"  总共发现: {analysis.get('total_findings', 0)} 处")
+        print(f"\n📊 Analysis stats:")
+        print(f"  Sensitive information types found: {analysis.get('type_count', 0)}")
+        print(f"  Total found: {analysis.get('total_findings', 0)}")
 
-        print(f"\n🔒 脱敏统计:")
-        print(f"  唯一实体数: {r.get('total_matched', 0)}")
-        print(f"  替换次数: {r.get('replacements_made', 0)}")
+        print(f"\n🔒 Anonymization stats:")
+        print(f"  Unique entities: {r.get('total_matched', 0)}")
+        print(f"  Replacements made: {r.get('replacements_made', 0)}")
 
         if 'output_txt' in r:
-            print(f"  文本输出: {r['output_txt']}")
+            print(f"  Text output: {r['output_txt']}")
         if 'output_pdf' in r:
-            print(f"  PDF输出: {r['output_pdf']}")
+            print(f"  PDF output: {r['output_pdf']}")
         if 'output_docx' in r:
-            print(f"  Word输出: {r['output_docx']}")
+            print(f"  Word output: {r['output_docx']}")
         if 'output_md' in r:
-            print(f"  Markdown输出: {r['output_md']}")
+            print(f"  Markdown output: {r['output_md']}")
         if 'text_backup' in r:
-            print(f"  文本备份: {r['text_backup']}")
+            print(f"  Text backup: {r['text_backup']}")
         if 'mapping_file' in r:
-            print(f"  映射表: {r['mapping_file']}")
+            print(f"  Mapping table: {r['mapping_file']}")
 
-        print("\n⚠️  注意: 映射表包含原始敏感信息，请妥善保管！")
+        print("\n⚠️  Note: the mapping table contains the original sensitive information. Keep it safe!")
 
 
 def print_analysis_summary(result: Dict, quiet: bool = False, with_context: bool = False):
-    """打印分析摘要"""
+    """Print an analysis summary."""
     if 'error' in result:
         if not quiet:
-            print(f"❌ 错误: {result['error']}", file=sys.stderr)
+            print(f"❌ Error: {result['error']}", file=sys.stderr)
         return
 
     r = result['result']
@@ -80,52 +80,52 @@ def print_analysis_summary(result: Dict, quiet: bool = False, with_context: bool
 
     if not quiet:
         print("\n" + "=" * 60)
-        print("📋 文档敏感信息分析")
+        print("📋 Document sensitive-information analysis")
         print("=" * 60)
 
-        print(f"\n📊 统计:")
-        print(f"  敏感信息类型: {analysis.get('type_count', 0)} 种")
-        print(f"  总共发现: {analysis.get('total_findings', 0)} 处")
+        print(f"\n📊 Stats:")
+        print(f"  Sensitive information types: {analysis.get('type_count', 0)}")
+        print(f"  Total found: {analysis.get('total_findings', 0)}")
 
         if findings:
-            print(f"\n📝 详细发现:")
+            print(f"\n📝 Detailed findings:")
             for entity_type, examples in sorted(findings.items()):
-                print(f"\n  【{entity_type}】({len(examples)} 个)")
-                # 最多显示5个例子（有上下文时全部显示，更利于审查）
+                print(f"\n  [{entity_type}] ({len(examples)} found)")
+                # Show at most 5 examples (show all when context is on, which helps review)
                 limit = len(examples) if with_context else 3
                 for i, example in enumerate(examples[:limit]):
                     if with_context and isinstance(example, dict):
-                        # 有上下文模式：显示前后文
+                        # Context mode: show the surrounding text
                         print(f"    ▸ {example['context'][:120]}")
                     else:
                         text_val = example if isinstance(example, str) else example.get('text', '')
                         if i == 2 and len(examples) > 3 and not with_context:
-                            print(f"    - {text_val[:50]}… (还有 {len(examples)-2} 个)")
+                            print(f"    - {text_val[:50]}… ({len(examples)-2} more)")
                         else:
                             print(f"    - {text_val[:60]}")
 
 
 def print_supported_types(anonymizer: LegalAnonymizer):
-    """打印支持的类型"""
+    """Print the supported types."""
     types = anonymizer.get_supported_types()
 
     print("\n" + "=" * 60)
-    print("📋 支持的敏感信息类型")
+    print("📋 Supported sensitive-information types")
     print("=" * 60)
     print()
 
-    # 分组显示
+    # Grouped display
     groups = {
-        "身份证件类": ['id_card', 'passport', 'hk_macau_pass', 'taiwan_pass', 'military_id'],
-        "企业/机构类": ['credit_code', 'org_code', 'tax_number'],
-        "案件/合同类": ['case_number', 'contract_number', 'invoice_number'],
-        "联系方式类": ['phone', 'fax', 'toll_free', 'email', 'website'],
-        "网络标识类": ['ip_address', 'mac_address'],
-        "金融类": ['bank_account', 'amount', 'price'],
-        "车辆类": ['license_plate', 'vin'],
-        "日期时间类": ['date', 'time', 'datetime'],
-        "地址类": ['full_address', 'postal_code', 'house_number'],
-        "证件/证书类": ['property_cert', 'permit_number'],
+        "Identity documents": ['id_card', 'passport', 'hk_macau_pass', 'taiwan_pass', 'military_id'],
+        "Company / institution": ['credit_code', 'org_code', 'tax_number'],
+        "Case / contract": ['case_number', 'contract_number', 'invoice_number'],
+        "Contact details": ['phone', 'fax', 'toll_free', 'email', 'website'],
+        "Network identifiers": ['ip_address', 'mac_address'],
+        "Financial": ['bank_account', 'amount', 'price'],
+        "Vehicle": ['license_plate', 'vin'],
+        "Date / time": ['date', 'time', 'datetime'],
+        "Address": ['full_address', 'postal_code', 'house_number'],
+        "Certificates / permits": ['property_cert', 'permit_number'],
     }
 
     all_type_names = set(types.keys())
@@ -140,116 +140,116 @@ def print_supported_types(anonymizer: LegalAnonymizer):
                 shown_types.add(t)
             print()
 
-    # 显示剩余类型
+    # Show the remaining types
     remaining = all_type_names - shown_types
     if remaining:
-        print("其他:")
+        print("Other:")
         for t in sorted(remaining):
             print(f"  • {t} - {types.get(t, '')}")
         print()
 
 
 def main():
-    """主函数"""
+    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description='法律文档脱敏工具 (by 黄灵宝同学) - 数据完全本地处理，保障隐私安全',
+        description='Legal Anonymizer (by Lingbao Huang) - all data is processed locally to protect privacy',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-示例:
-  # 基本用法 - 脱敏PDF文件
+Examples:
+  # Basic usage - anonymize a PDF file
   %(prog)s anonymize input.pdf -o output.pdf
 
-  # 脱敏文本文件
+  # Anonymize a text file
   %(prog)s anonymize input.txt -o output.txt
 
-  # 脱敏Word文档
+  # Anonymize a Word document
   %(prog)s anonymize input.docx -o output.docx
 
-  # 使用自定义实体
+  # Use custom entities
   %(prog)s anonymize input.pdf -o output.pdf -e entities.json
 
-  # 只脱敏指定字段
+  # Anonymize only specific fields
   %(prog)s anonymize input.pdf -o output.txt --only phone,email
 
-  # 排除某些字段不脱敏
+  # Exclude certain fields from anonymization
   %(prog)s anonymize input.pdf -o output.txt --exclude amount,date
 
-  # 使用部分掩码策略（保留部分信息）
+  # Use the partial mask strategy (keep part of the information)
   %(prog)s anonymize input.pdf -o output.pdf --mask-strategy partial
 
-  # 分析文档（不实际脱敏）
+  # Analyze a document (without actually anonymizing)
   %(prog)s analyze input.pdf
 
-  # 列出所有支持的字段
+  # List all supported fields
   %(prog)s list-types
         """
     )
 
-    subparsers = parser.add_subparsers(title='命令', dest='command', required=True)
+    subparsers = parser.add_subparsers(title='Commands', dest='command', required=True)
 
-    # ========== anonymize 命令 ==========
-    anonymize_parser = subparsers.add_parser('anonymize', help='脱敏文件')
-    anonymize_parser.add_argument('input', help='输入文件路径')
-    anonymize_parser.add_argument('-o', '--output', help='输出文件路径')
-    anonymize_parser.add_argument('-e', '--entities', help='自定义实体 JSON 文件路径')
+    # ========== anonymize command ==========
+    anonymize_parser = subparsers.add_parser('anonymize', help='Anonymize a file')
+    anonymize_parser.add_argument('input', help='Input file path')
+    anonymize_parser.add_argument('-o', '--output', help='Output file path')
+    anonymize_parser.add_argument('-e', '--entities', help='Path to a custom-entities JSON file')
     anonymize_parser.add_argument('-f', '--format',
                                      default='auto',
-                                     help='输出格式：auto/txt/md/pdf/docx，或逗号分隔多格式（如 md,docx,pdf）')
-    anonymize_parser.add_argument('--only', help='只脱敏指定字段，逗号分隔')
-    anonymize_parser.add_argument('--exclude', help='排除指定字段，逗号分隔')
+                                     help='Output format: auto/txt/md/pdf/docx, or a comma-separated list (e.g. md,docx,pdf)')
+    anonymize_parser.add_argument('--only', help='Anonymize only the specified fields, comma-separated')
+    anonymize_parser.add_argument('--exclude', help='Exclude the specified fields, comma-separated')
     anonymize_parser.add_argument('--mask-strategy', choices=['placeholder', 'partial'],
-                                     help='掩码策略: placeholder(占位符) 或 partial(部分掩码)')
+                                     help='Mask strategy: placeholder or partial (partial mask)')
     anonymize_parser.add_argument('--all-strategy', choices=['placeholder', 'partial'],
-                                     help='为所有类型设置掩码策略')
-    anonymize_parser.add_argument('--ocr', action='store_true', help='对PDF使用OCR（处理扫描版）')
+                                     help='Set the mask strategy for all types')
+    anonymize_parser.add_argument('--ocr', action='store_true', help='Use OCR on PDFs (for scanned documents)')
     anonymize_parser.add_argument('--ocr-engine', choices=['rapidocr', 'paddleocr', 'tesseract'],
                                      default='rapidocr',
-                                     help='OCR 引擎：rapidocr（默认，快）| paddleocr（慢但对复杂排版更准）| tesseract')
+                                     help='OCR engine: rapidocr (default, fast) | paddleocr (slower but more accurate on complex layouts) | tesseract')
     anonymize_parser.add_argument('--llm', action='store_true',
-                                     help='启用 OpenAI privacy-filter (1.5B) 作为补充检测层 '
-                                          '（首次使用会下载 ~2.6GB 模型；中文文档主要补英文实体）')
+                                     help='Enable the OpenAI privacy-filter (1.5B) as an extra detection layer '
+                                          '(first use downloads a ~2.6GB model; for Chinese documents it mainly catches English entities)')
     anonymize_parser.add_argument('--cn-llm', action='store_true',
-                                     help='启用 CLUENER 中文 NER (RoBERTa-base) 作为补充层 '
-                                          '（~400MB；补规则漏掉的中文人名/公司/地址）')
+                                     help='Enable CLUENER Chinese NER (RoBERTa-base) as an extra layer '
+                                          '(~400MB; catches Chinese names/companies/addresses the rules miss)')
     anonymize_parser.add_argument('--ollama', action='store_true',
-                                     help='启用本地 Ollama 大模型作为第 5 补充层（无需额外下载，需本机运行 Ollama）')
+                                     help='Enable a local Ollama LLM as a 5th extra layer (no extra download; requires Ollama running locally)')
     anonymize_parser.add_argument('--ollama-url', default=None, metavar='URL',
-                                     help='Ollama 服务地址（默认 http://localhost:11434，'
-                                          '或由 LEGAL_ANONYMIZER_OLLAMA_URL 环境变量指定）')
+                                     help='Ollama service address (default http://localhost:11434, '
+                                          'or set via the LEGAL_ANONYMIZER_OLLAMA_URL environment variable)')
     anonymize_parser.add_argument('--ollama-model', default=None, metavar='MODEL',
-                                     help='Ollama 模型名（默认 qwen2.5:7b，'
-                                          '或由 LEGAL_ANONYMIZER_OLLAMA_MODEL 环境变量指定）')
-    anonymize_parser.add_argument('--no-backup', action='store_true', help='不保存文本备份')
-    anonymize_parser.add_argument('--no-mapping', action='store_true', help='不保存映射表')
-    anonymize_parser.add_argument('-q', '--quiet', action='store_true', help='安静模式，只输出JSON')
+                                     help='Ollama model name (default qwen2.5:7b, '
+                                          'or set via the LEGAL_ANONYMIZER_OLLAMA_MODEL environment variable)')
+    anonymize_parser.add_argument('--no-backup', action='store_true', help='Do not save a text backup')
+    anonymize_parser.add_argument('--no-mapping', action='store_true', help='Do not save the mapping table')
+    anonymize_parser.add_argument('-q', '--quiet', action='store_true', help='Quiet mode, output JSON only')
 
-    # ========== analyze 命令 ==========
-    analyze_parser = subparsers.add_parser('analyze', help='分析文档敏感信息')
-    analyze_parser.add_argument('input', help='输入文件路径')
-    analyze_parser.add_argument('--only', help='只分析指定字段，逗号分隔')
-    analyze_parser.add_argument('--exclude', help='排除指定字段，逗号分隔')
-    analyze_parser.add_argument('--ocr', action='store_true', help='对PDF使用OCR')
+    # ========== analyze command ==========
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze a document for sensitive information')
+    analyze_parser.add_argument('input', help='Input file path')
+    analyze_parser.add_argument('--only', help='Analyze only the specified fields, comma-separated')
+    analyze_parser.add_argument('--exclude', help='Exclude the specified fields, comma-separated')
+    analyze_parser.add_argument('--ocr', action='store_true', help='Use OCR on PDFs')
     analyze_parser.add_argument('--ocr-engine', choices=['rapidocr', 'paddleocr', 'tesseract'],
                                 default='rapidocr',
-                                help='OCR 引擎：rapidocr（默认，快）| paddleocr（慢但精准）| tesseract')
+                                help='OCR engine: rapidocr (default, fast) | paddleocr (slower but more accurate) | tesseract')
     analyze_parser.add_argument('--llm', action='store_true',
-                                help='启用 OpenAI privacy-filter 作为补充检测层')
+                                help='Enable the OpenAI privacy-filter as an extra detection layer')
     analyze_parser.add_argument('--cn-llm', action='store_true',
-                                help='启用 CLUENER 中文 NER 作为补充层')
+                                help='Enable CLUENER Chinese NER as an extra layer')
     analyze_parser.add_argument('--ollama', action='store_true',
-                                help='启用本地 Ollama 大模型作为第 5 补充层')
+                                help='Enable a local Ollama LLM as a 5th extra layer')
     analyze_parser.add_argument('--ollama-url', default=None, metavar='URL',
-                                help='Ollama 服务地址（默认 http://localhost:11434）')
+                                help='Ollama service address (default http://localhost:11434)')
     analyze_parser.add_argument('--ollama-model', default=None, metavar='MODEL',
-                                help='Ollama 模型名（默认 qwen2.5:7b）')
+                                help='Ollama model name (default qwen2.5:7b)')
     analyze_parser.add_argument('--context', action='store_true',
-                                help='显示每个检测结果的前后文，便于判断是否误报')
+                                help='Show the surrounding text for each detection, to help judge false positives')
     analyze_parser.add_argument('--context-window', type=int, default=40,
-                                help='前后文窗口大小（字符数，默认40）')
-    analyze_parser.add_argument('-q', '--quiet', action='store_true', help='安静模式，只输出JSON')
+                                help='Context window size (in characters, default 40)')
+    analyze_parser.add_argument('-q', '--quiet', action='store_true', help='Quiet mode, output JSON only')
 
-    # ========== list-types 命令 ==========
-    list_types_parser = subparsers.add_parser('list-types', help='列出所有支持的字段')
+    # ========== list-types command ==========
+    list_types_parser = subparsers.add_parser('list-types', help='List all supported fields')
 
     args = parser.parse_args()
 
@@ -273,31 +273,31 @@ def main():
         return
 
     elif args.command == 'anonymize':
-        # 加载自定义实体
+        # Load custom entities
         custom_entities = None
         if args.entities:
             custom_entities = load_entities_from_file(args.entities)
 
-        # 解析字段过滤
+        # Parse the field filters
         only_types = args.only.split(',') if args.only else None
         exclude_types = args.exclude.split(',') if args.exclude else None
 
-        # 设置掩码策略
+        # Set the mask strategy
         if args.all_strategy:
             anonymizer.set_all_mask_strategy(args.all_strategy)
         elif args.mask_strategy:
-            # 为常见类型设置部分掩码
+            # Apply partial masking to the common types
             partial_types = ['id_card', 'phone', 'fax', 'toll_free', 'bank_account',
                            'email', 'passport', 'credit_code', 'license_plate']
             for etype in partial_types:
                 anonymizer.set_mask_strategy(etype, args.mask_strategy)
 
-        # 解析 --format：单格式字符串或逗号分隔多格式 list
+        # Parse --format: a single format string or a comma-separated list of formats
         fmt_arg = args.format
         if fmt_arg and ',' in fmt_arg:
             fmt_arg = [s.strip() for s in fmt_arg.split(',') if s.strip()]
 
-        # 执行脱敏
+        # Run anonymization
         result = anonymizer.anonymize_file(
             args.input,
             args.output,
@@ -311,7 +311,7 @@ def main():
             save_mapping=not args.no_mapping
         )
 
-        # 打印结果
+        # Print the result
         print_result_summary(result, args.quiet)
         print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -1,99 +1,99 @@
 #!/bin/bash
-# 法律文档脱敏工具 - 安装脚本
+# Legal Anonymizer - install script
 
 set -e
 
 echo "========================================"
-echo "法律文档脱敏工具 - 安装"
+echo "Legal Anonymizer - install"
 echo "========================================"
 
-# 检测Python版本
+# Detect the Python version
 echo ""
-echo "检查Python版本..."
+echo "Checking the Python version..."
 if command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 elif command -v python &> /dev/null; then
     PYTHON_CMD=python
 else
-    echo "错误: 未找到Python，请先安装Python 3.7+"
+    echo "Error: Python not found. Please install Python 3.7+ first."
     exit 1
 fi
 
 PYTHON_VERSION=$($PYTHON_CMD --version | cut -d' ' -f2)
-echo "  Python版本: $PYTHON_VERSION"
+echo "  Python version: $PYTHON_VERSION"
 
-# 创建虚拟环境（可选）
+# Create a virtual environment (optional)
 echo ""
-read -p "是否创建虚拟环境? (y/n, 默认n): " CREATE_VENV
+read -p "Create a virtual environment? (y/n, default n): " CREATE_VENV
 CREATE_VENV=${CREATE_VENV:-n}
 
 if [ "$CREATE_VENV" = "y" ] || [ "$CREATE_VENV" = "Y" ]; then
-    echo "创建虚拟环境..."
+    echo "Creating the virtual environment..."
     $PYTHON_CMD -m venv .venv
-    echo "激活虚拟环境..."
+    echo "Activating the virtual environment..."
     if [[ "$OSTYPE" == "darwin"* ]] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
         source .venv/bin/activate
         PYTHON_CMD=.venv/bin/python
         PIP_CMD=.venv/bin/pip
     else
-        echo "Windows请手动激活虚拟环境: .venv\Scripts\activate"
+        echo "On Windows, activate the virtual environment manually: .venv\Scripts\activate"
     fi
-    echo "虚拟环境已创建"
+    echo "Virtual environment created"
 else
     PIP_CMD=pip
 fi
 
-# 升级pip
+# Upgrade pip
 echo ""
-echo "升级pip..."
+echo "Upgrading pip..."
 $PYTHON_CMD -m pip install --upgrade pip
 
-# 安装基础依赖
+# Install the base dependencies
 echo ""
-echo "安装基础依赖..."
+echo "Installing the base dependencies..."
 $PIP_CMD install -r requirements.txt
 
-# 询问是否安装OCR依赖
+# Ask whether to install OCR dependencies
 echo ""
-read -p "是否安装OCR支持（用于处理扫描版PDF）? (y/n, 默认n): " INSTALL_OCR
+read -p "Install OCR support (for scanned PDFs)? (y/n, default n): " INSTALL_OCR
 INSTALL_OCR=${INSTALL_OCR:-n}
 
 if [ "$INSTALL_OCR" = "y" ] || [ "$INSTALL_OCR" = "Y" ]; then
-    echo "安装OCR依赖..."
+    echo "Installing OCR dependencies..."
     $PIP_CMD install pillow pytesseract
 
     echo ""
-    echo "提示: 您还需要安装Tesseract OCR引擎:"
+    echo "Note: you also need to install the Tesseract OCR engine:"
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo "  macOS: brew install tesseract"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo "  Ubuntu/Debian: sudo apt install tesseract-ocr"
     else
-        echo "  Windows: 下载安装 https://github.com/UB-Mannheim/tesseract/wiki"
+        echo "  Windows: download and install from https://github.com/UB-Mannheim/tesseract/wiki"
     fi
 fi
 
-# 运行测试
+# Run the tests
 echo ""
-read -p "是否运行测试? (y/n, 默认y): " RUN_TEST
+read -p "Run the tests? (y/n, default y): " RUN_TEST
 RUN_TEST=${RUN_TEST:-y}
 
 if [ "$RUN_TEST" = "y" ] || [ "$RUN_TEST" = "Y" ]; then
     echo ""
-    echo "运行测试..."
+    echo "Running the tests..."
     $PYTHON_CMD test.py
 fi
 
 echo ""
 echo "========================================"
-echo "安装完成！"
+echo "Installation complete!"
 echo "========================================"
 echo ""
-echo "快速开始:"
-echo "  查看帮助: $PYTHON_CMD cli.py --help"
-echo "  脱敏文件: $PYTHON_CMD cli.py anonymize input.pdf -o output.pdf"
-echo "  分析文件: $PYTHON_CMD cli.py analyze input.pdf"
-echo "  列出类型: $PYTHON_CMD cli.py list-types"
+echo "Quick start:"
+echo "  Show help:       $PYTHON_CMD cli.py --help"
+echo "  Anonymize a file: $PYTHON_CMD cli.py anonymize input.pdf -o output.pdf"
+echo "  Analyze a file:   $PYTHON_CMD cli.py analyze input.pdf"
+echo "  List the types:   $PYTHON_CMD cli.py list-types"
 echo ""
-echo "更多示例请查看 examples/ 目录"
+echo "See the examples/ directory for more examples"
 echo ""

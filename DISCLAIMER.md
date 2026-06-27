@@ -1,66 +1,66 @@
-# 免责声明 / Disclaimer
+# Disclaimer
 
-## 重要提醒
+## Important notice
 
-本工具是一款**辅助性脱敏工具**，**不能替代人工复核**。
+This is an **assistive redaction tool**, and it **does not replace human review**.
 
-使用本工具处理任何法律文书、合同、案件卷宗或其他涉密文件时，使用者**必须**：
+When you use this tool to process any legal document, contract, case file, or other confidential material, you **must**:
 
-1. **逐项审核**工具识别出的敏感信息，确认无遗漏、无错判；
-2. **二次校对**最终输出的脱敏文件，亲自确认所有客户、当事人、敏感信息已被妥善替换；
-3. **理解局限**：任何自动脱敏工具（包括本工具及其使用的 AI 模型）都存在漏检和误报的可能。
+1. **Review every item** the tool flags as sensitive, confirming nothing is missed or misjudged;
+2. **Proofread the final output** redacted file and personally confirm that every client, party, and piece of sensitive information has been properly replaced;
+3. **Understand the limits**: any automated redaction tool (including this tool and the AI models it uses) can both miss items and produce false positives.
 
-## 责任界定
+## Allocation of responsibility
 
-- 本工具开发者**不对**任何因使用本工具产生的信息泄露、合规问题、客户投诉、职业纪律责任等承担任何责任；
-- 使用者作为**专业人士**（律师 / 法务 / 合规人员），应独立判断本工具是否适合其具体业务场景；
-- 在交付脱敏文件给客户、对方当事人、法院、监管机构或公开发布前，**最终责任由使用者承担**。
+- The developer of this tool **accepts no responsibility** for any information disclosure, compliance issue, client complaint, professional-discipline liability, or other consequence arising from use of this tool;
+- As a **professional** (lawyer / in-house counsel / compliance officer), the user should independently judge whether this tool is suitable for their specific business scenario;
+- Before delivering a redacted file to a client, opposing party, court, regulator, or the public, **the final responsibility rests with the user**.
 
-## 适用场景
+## Suitable use cases
 
-本工具**适合**：
+This tool is **suitable for**:
 
-- 内部学习材料的脱敏处理
-- 论文 / 案例研究 / 培训资料的去标识化
-- 提交给 AI 模型（ChatGPT / Claude 等）做语义分析前的预处理
-- 律所内部知识库建设的批量脱敏
+- Redacting internal study materials
+- De-identifying papers / case studies / training materials
+- Pre-processing before submitting content to AI models (ChatGPT / Claude, etc.) for semantic analysis
+- Batch redaction when building a firm's internal knowledge base
 
-本工具**不建议直接用于**（除非配合严格人工复核）：
+This tool is **not recommended for direct use** (unless paired with strict human review):
 
-- 正式提交法院 / 仲裁机构的脱敏证据材料
-- 政府监管报送的合规去标识化文件
-- 涉及国家秘密 / 商业秘密的文件处理
-- 任何对脱敏完整性有零容忍要求的场景
+- Redacted evidence formally submitted to a court / arbitration body
+- Compliance de-identification documents reported to government regulators
+- Handling documents involving state secrets / trade secrets
+- Any scenario with zero tolerance for incomplete redaction
 
-## 第三方组件免责
+## Third-party component disclaimer
 
-本工具集成或依赖以下第三方开源组件，其各自遵循对应的开源协议：
+This tool integrates or depends on the following third-party open-source components, each governed by its own open-source license:
 
-- **OpenAI Privacy Filter**（Apache 2.0）—— 英文 PII 识别
-- **CLUENER 2020 RoBERTa**（HuggingFace 默认协议）—— 中文 NER
-- **RapidOCR**（Apache 2.0）—— OCR 引擎
-- **PaddleOCR**（Apache 2.0）—— OCR 备选引擎
-- **PyMuPDF**（AGPL-3.0）—— PDF 处理
-- **python-docx / Flask / PyTorch / Transformers** —— 各自协议
+- **OpenAI Privacy Filter** (Apache 2.0) — English PII detection
+- **CLUENER 2020 RoBERTa** (HuggingFace default license) — Chinese NER
+- **RapidOCR** (Apache 2.0) — OCR engine
+- **PaddleOCR** (Apache 2.0) — alternative OCR engine
+- **PyMuPDF** (AGPL-3.0) — PDF processing
+- **python-docx / Flask / PyTorch / Transformers** — respective licenses
 
-第三方组件的准确性、稳定性、合规性由各组件维护方负责。
+The accuracy, stability, and compliance of third-party components are the responsibility of their respective maintainers.
 
-## 隐私承诺
+## Privacy commitment
 
-- 本工具代码**完全开源**，可独立审计；
-- **零网络调用**：项目代码内 `grep -r "requests|urllib|http" *.py` 应返回空结果；
-- AI 模型首次运行时从公开镜像（HuggingFace / ModelScope）下载到本地 `~/.cache/`，之后完全离线运行；
-- **可设置三个环境变量彻底阻止任何模型心跳**：
+- The code of this tool is **fully open source** and can be independently audited;
+- **Zero network calls**: running `grep -r "requests|urllib|http" *.py` over the project code should return nothing;
+- AI models are downloaded on first run from public mirrors (HuggingFace / ModelScope) to a local `~/.cache/`, and run fully offline thereafter;
+- **You can set three environment variables to completely block any model heartbeat**:
   - `HF_HUB_OFFLINE=1`
   - `TRANSFORMERS_OFFLINE=1`
   - `PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=1`
 
-## 协议条款
+## Terms of agreement
 
-使用本工具即视为您**已阅读并同意**本免责声明的全部内容。如不同意，请勿使用。
+By using this tool, you are deemed to **have read and agreed to** the entire content of this disclaimer. If you do not agree, do not use it.
 
-本免责声明根据《中华人民共和国民法典》《中华人民共和国合同法》及其他适用法律解释。
+This disclaimer is interpreted under the Civil Code of the People's Republic of China, the Contract Law of the People's Republic of China, and other applicable laws.
 
 ---
 
-*最后更新：2026-04-26*
+*Last updated: 2026-04-26*

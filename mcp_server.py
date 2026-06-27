@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 Legal Document Anonymizer - MCP Server
-法律文档脱敏工具 - MCP Server
 
-通过 MCP (Model Context Protocol) 协议提供脱敏服务。
-数据完全本地处理，不上传云端。
+Provides redaction services over the MCP (Model Context Protocol).
+All data is processed locally and never uploaded to the cloud.
 
-配置方法 - 在 ~/.claude/settings.json 中添加:
+Configuration - add the following to ~/.claude/settings.json:
 {
   "mcpServers": {
     "legal-anonymizer": {
@@ -23,7 +22,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-# 确保模块路径
+# Make sure the module path is on sys.path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from anonymizer import LegalAnonymizer
@@ -38,9 +37,9 @@ except ImportError:
 
 
 def create_mcp_server():
-    """创建 MCP Server"""
+    """Create the MCP server."""
     if not HAS_MCP:
-        raise ImportError("需要安装 MCP SDK: pip install mcp")
+        raise ImportError("The MCP SDK is required: pip install mcp")
 
     server = Server("legal-anonymizer-server")
 
@@ -49,49 +48,49 @@ def create_mcp_server():
         return [
             Tool(
                 name="anonymize_file",
-                description="脱敏文件 - 支持 PDF、Word(.doc/.docx)、图片、文本。自动识别人名、公司名、身份证、手机号等敏感信息。数据完全本地处理。",
+                description="Redact a file. Supports PDF, Word (.doc/.docx), images, and plain text. Automatically detects sensitive information such as person names, company names, ID numbers, and mobile numbers. All data is processed locally.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "input_path": {
                             "type": "string",
-                            "description": "输入文件路径"
+                            "description": "Input file path"
                         },
                         "output_path": {
                             "type": "string",
-                            "description": "输出文件路径（可选，默认在同目录生成）"
+                            "description": "Output file path (optional; defaults to the same directory)"
                         },
                         "entities": {
                             "type": "string",
-                            "description": "自定义实体 JSON 字符串，格式: [{\"type\":\"person\",\"name\":\"张三\"}]（可选）"
+                            "description": "Custom entities as a JSON string, e.g. [{\"type\":\"person\",\"name\":\"张三\"}] (optional)"
                         },
                         "entities_path": {
                             "type": "string",
-                            "description": "自定义实体 JSON 文件路径（可选）"
+                            "description": "Path to a custom-entities JSON file (optional)"
                         },
                         "output_format": {
                             "type": "string",
-                            "description": "输出格式",
+                            "description": "Output format",
                             "enum": ["auto", "txt", "pdf", "docx", "md"],
                             "default": "auto"
                         },
                         "only_types": {
                             "type": "string",
-                            "description": "只脱敏指定类型，逗号分隔（可选）"
+                            "description": "Redact only the listed types, comma-separated (optional)"
                         },
                         "exclude_types": {
                             "type": "string",
-                            "description": "排除指定类型，逗号分隔（可选）"
+                            "description": "Exclude the listed types, comma-separated (optional)"
                         },
                         "mask_strategy": {
                             "type": "string",
-                            "description": "掩码策略: placeholder（占位符）或 partial（部分掩码）",
+                            "description": "Mask strategy: placeholder or partial (partial masking)",
                             "enum": ["placeholder", "partial"],
                             "default": "placeholder"
                         },
                         "use_ocr": {
                             "type": "boolean",
-                            "description": "对PDF使用OCR（处理扫描版）",
+                            "description": "Use OCR for PDFs (handles scanned documents)",
                             "default": False
                         }
                     },
@@ -100,29 +99,29 @@ def create_mcp_server():
             ),
             Tool(
                 name="anonymize_text",
-                description="脱敏文本内容 - 直接对文本进行脱敏处理，自动识别敏感信息",
+                description="Redact text content. Runs redaction directly on text and automatically detects sensitive information.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "text": {
                             "type": "string",
-                            "description": "要脱敏的文本内容"
+                            "description": "The text content to redact"
                         },
                         "entities": {
                             "type": "string",
-                            "description": "自定义实体 JSON 字符串（可选）"
+                            "description": "Custom entities as a JSON string (optional)"
                         },
                         "only_types": {
                             "type": "string",
-                            "description": "只脱敏指定类型，逗号分隔（可选）"
+                            "description": "Redact only the listed types, comma-separated (optional)"
                         },
                         "exclude_types": {
                             "type": "string",
-                            "description": "排除指定类型，逗号分隔（可选）"
+                            "description": "Exclude the listed types, comma-separated (optional)"
                         },
                         "mask_strategy": {
                             "type": "string",
-                            "description": "掩码策略",
+                            "description": "Mask strategy",
                             "enum": ["placeholder", "partial"]
                         }
                     },
@@ -131,21 +130,21 @@ def create_mcp_server():
             ),
             Tool(
                 name="analyze_document",
-                description="分析文档敏感信息 - 识别文档中的敏感信息但不实际脱敏",
+                description="Analyze a document for sensitive information. Detects sensitive information in the document without actually redacting it.",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "input_path": {
                             "type": "string",
-                            "description": "输入文件路径"
+                            "description": "Input file path"
                         },
                         "only_types": {
                             "type": "string",
-                            "description": "只分析指定类型，逗号分隔（可选）"
+                            "description": "Analyze only the listed types, comma-separated (optional)"
                         },
                         "exclude_types": {
                             "type": "string",
-                            "description": "排除指定类型，逗号分隔（可选）"
+                            "description": "Exclude the listed types, comma-separated (optional)"
                         }
                     },
                     "required": ["input_path"]
@@ -153,7 +152,7 @@ def create_mcp_server():
             ),
             Tool(
                 name="list_supported_types",
-                description="列出所有支持的敏感信息类型",
+                description="List all supported sensitive-information types.",
                 inputSchema={
                     "type": "object",
                     "properties": {}
@@ -163,7 +162,7 @@ def create_mcp_server():
 
     @server.call_tool()
     async def call_tool(name: str, arguments: Any) -> list[TextContent]:
-        # 每次调用创建新实例，避免状态污染
+        # Create a new instance per call to avoid state leakage
         anonymizer = LegalAnonymizer()
 
         try:
@@ -177,7 +176,7 @@ def create_mcp_server():
                 return await _handle_list_types(anonymizer)
             else:
                 return [TextContent(type="text", text=json.dumps(
-                    {"error": f"未知工具: {name}"}, ensure_ascii=False
+                    {"error": f"Unknown tool: {name}"}, ensure_ascii=False
                 ))]
         except Exception as e:
             return [TextContent(type="text", text=json.dumps(
@@ -190,14 +189,14 @@ def create_mcp_server():
         output_format = args.get("output_format", "auto")
         use_ocr = args.get("use_ocr", False)
 
-        # 加载自定义实体
+        # Load custom entities
         custom_entities = _parse_entities(args)
 
-        # 解析字段过滤
+        # Parse the type filters
         only_types = args.get("only_types", "").split(",") if args.get("only_types") else None
         exclude_types = args.get("exclude_types", "").split(",") if args.get("exclude_types") else None
 
-        # 设置掩码策略
+        # Set the mask strategy
         if args.get("mask_strategy"):
             anonymizer.set_all_mask_strategy(args["mask_strategy"])
 
@@ -253,15 +252,15 @@ def create_mcp_server():
     async def _handle_list_types(anonymizer: LegalAnonymizer) -> list[TextContent]:
         types = anonymizer.get_supported_types()
 
-        # 补充自动检测支持的类型
+        # Add the types covered by automatic detection
         auto_types = {
-            'person': '人名（自动检测）',
-            'company': '公司名（自动检测）',
-            'law_firm': '律师事务所（自动检测）',
-            'court': '法院名称（自动检测）',
-            'government': '政府机关（自动检测）',
-            'institution': '机构名称（自动检测）',
-            'bank_name': '银行名称（自动检测）',
+            'person': 'Person name (auto-detected)',
+            'company': 'Company (auto-detected)',
+            'law_firm': 'Law firm (auto-detected)',
+            'court': 'Court (auto-detected)',
+            'government': 'Government (auto-detected)',
+            'institution': 'Institution (auto-detected)',
+            'bank_name': 'Bank (auto-detected)',
         }
         types.update(auto_types)
 
@@ -277,7 +276,7 @@ def create_mcp_server():
         return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
     def _parse_entities(args: dict):
-        """解析自定义实体参数"""
+        """Parse the custom-entities argument."""
         entities_str = args.get("entities")
         entities_path = args.get("entities_path")
 
@@ -305,8 +304,8 @@ async def main():
 
 if __name__ == "__main__":
     if not HAS_MCP:
-        print("错误: 需要安装 MCP SDK", file=sys.stderr)
-        print("安装命令: pip install mcp", file=sys.stderr)
+        print("Error: the MCP SDK is required", file=sys.stderr)
+        print("Install with: pip install mcp", file=sys.stderr)
         sys.exit(1)
 
     asyncio.run(main())

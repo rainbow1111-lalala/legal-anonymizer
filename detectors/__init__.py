@@ -1,6 +1,6 @@
 """
 Sensitive Data Detectors
-敏感数据检测器模块
+Module: sensitive data detectors
 """
 from .pattern_detector import PatternDetector
 from .entity_detector import EntityDetector

@@ -1,19 +1,23 @@
 """
 LLM-based PII Detector (OpenAI privacy-filter)
-基于 OpenAI privacy-filter（1.5B MoE, 50M active）的 PII 检测器
+A PII detector built on the OpenAI privacy-filter model (1.5B MoE, 50M active).
 
-该模型主要面向英文/拉丁文字，官方说明："Performance may drop on non-English text,
-non-Latin scripts." 因此本检测器在本项目中的定位是**补充层**：
-  - 覆盖中文规则盲区：英文人名、英文地址、英文机构名、API key / secret、英文 URL
-  - 对英文邮箱/电话/日期做交叉验证
-  - 中文人名/公司名仍以 EntityDetector 的规则为准
+This model targets mainly English/Latin scripts. Per the official notes:
+"Performance may drop on non-English text, non-Latin scripts." So in this project
+it serves as a **supplementary layer**:
+  - Cover the blind spots of the Chinese rules: English person names, English
+    addresses, English institution names, API key / secret, English URLs
+  - Cross-check English emails/phones/dates
+  - Chinese person and company names still rely on the EntityDetector rules
 
-设计要点：
-  1. 懒加载：首次调用 detect() 时才加载模型，避免启动变慢
-  2. 依赖缺失时优雅降级：transformers/torch 没装就返回空列表并打印提示
-  3. 类型映射：把 privacy-filter 的 8 类 PII 映射到项目现有类型体系
-  4. 位置对齐：transformers pipeline 返回的 offset 对齐原文字符索引
-  5. 过滤短片段：< 2 字符的命中通常是误报
+Design notes:
+  1. Lazy loading: the model is loaded only on the first detect() call, so startup stays fast
+  2. Graceful degradation on missing dependencies: if transformers/torch is not installed,
+     return an empty list and print a hint
+  3. Type mapping: map the 8 privacy-filter PII classes onto the project's existing type system
+  4. Offset alignment: align the offsets returned by the transformers pipeline to the
+     character indices of the original text
+  5. Short-fragment filtering: hits shorter than 2 characters are usually false positives
 """
 
 from __future__ import annotations
@@ -24,9 +28,9 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# OpenAI privacy-filter 的 8 类 → 本项目类型
-# 注意：privacy-filter 的 private_person 在中文文本上召回很低，所以我们保留但不
-# 依赖它；中文人名主要靠规则层 EntityDetector 兜底。
+# The 8 privacy-filter classes -> this project's types
+# Note: privacy-filter's private_person has very low recall on Chinese text, so we keep
+# but do not rely on it; Chinese person names fall back mainly to the EntityDetector rules layer.
 LABEL_MAP = {
     "account_number": "bank_account",
     "private_address": "full_address",
@@ -35,14 +39,14 @@ LABEL_MAP = {
     "private_phone": "phone",
     "private_url": "website",
     "private_date": "date",
-    "secret": "secret",  # API key / token，项目里作为新类型
+    "secret": "secret",  # API key / token, a new type in this project
 }
 
 DEFAULT_MODEL_ID = "openai/privacy-filter"
 
 
 class LLMDetector:
-    """基于 token-classification LLM 的 PII 检测器（懒加载）"""
+    """PII detector built on a token-classification LLM (lazy-loaded)."""
 
     def __init__(
         self,
@@ -54,13 +58,13 @@ class LLMDetector:
     ):
         """
         Args:
-            model_id: HuggingFace 模型 ID
-            device: "cpu" | "mps" | "cuda" | None（自动选择）
-            min_score: 最低置信度阈值
-            max_chars: 单次推理最大字符数；超出会自动分段
-            only_latin_spans: True 时丢弃命中中完全不含拉丁字母/数字的片段
-                              —— 因为模型对中文召回不稳，容易产出误报。
-                              关掉后可观察模型对中文的表现。
+            model_id: HuggingFace model ID
+            device: "cpu" | "mps" | "cuda" | None (auto-selected)
+            min_score: minimum confidence threshold
+            max_chars: maximum characters per inference call; longer text is chunked automatically
+            only_latin_spans: when True, drop hits that contain no Latin letters or digits at all,
+                              because the model's recall on Chinese is unstable and prone to
+                              false positives. Turn it off to observe the model's Chinese behavior.
         """
         self.model_id = model_id
         self.device = device
@@ -71,7 +75,7 @@ class LLMDetector:
         self._pipeline = None
         self._load_error: Optional[str] = None
 
-    # ---------------- 懒加载 ----------------
+    # ---------------- Lazy loading ----------------
 
     def _ensure_loaded(self) -> bool:
         if self._pipeline is not None:
@@ -87,7 +91,7 @@ class LLMDetector:
             )
         except ImportError as e:
             self._load_error = (
-                f"缺少依赖：{e.name}。请先安装：\n"
+                f"Missing dependency: {e.name}. Install with:\n"
                 f"  pip install torch transformers"
             )
             logger.warning(self._load_error)
@@ -108,7 +112,7 @@ class LLMDetector:
             logger.info(f"[llm_detector] loading {self.model_id} on {device} ...")
             tokenizer = AutoTokenizer.from_pretrained(self.model_id)
             model = AutoModelForTokenClassification.from_pretrained(self.model_id)
-            # HF pipeline 自己处理 BIOES 聚合（aggregation_strategy="simple"）
+            # The HF pipeline handles BIOES aggregation itself (aggregation_strategy="simple")
             self._pipeline = pipeline(
                 task="token-classification",
                 model=model,
@@ -119,20 +123,20 @@ class LLMDetector:
             logger.info(f"[llm_detector] model loaded on {device}")
             return True
         except Exception as e:
-            self._load_error = f"模型加载失败: {e}"
+            self._load_error = f"Model loading failed: {e}"
             logger.exception(self._load_error)
             return False
 
     @property
     def available(self) -> bool:
-        """尝试加载并返回是否可用（不抛异常）"""
+        """Try to load and report whether the detector is available (does not raise)."""
         return self._ensure_loaded()
 
     @property
     def load_error(self) -> Optional[str]:
         return self._load_error
 
-    # ---------------- 检测 ----------------
+    # ---------------- Detection ----------------
 
     def detect(
         self,
@@ -141,13 +145,13 @@ class LLMDetector:
         exclude_types: Optional[List[str]] = None,
     ) -> List[Tuple[str, str, int]]:
         """
-        检测 PII，返回 [(entity_text, mapped_type, start_pos), ...]
-        与 PatternDetector.detect() 签名对齐。
+        Detect PII and return [(entity_text, mapped_type, start_pos), ...].
+        Matches the PatternDetector.detect() signature.
         """
         if not text or not self._ensure_loaded():
             return []
 
-        # 分段推理，避免超长文本 OOM
+        # Run inference in chunks to avoid OOM on very long text
         results: List[Tuple[str, str, int]] = []
         offset = 0
         for chunk in self._split_chunks(text, self.max_chars):
@@ -160,7 +164,7 @@ class LLMDetector:
 
             for span in spans:
                 label = span.get("entity_group") or span.get("entity") or ""
-                # privacy-filter 模型 label 可能带 B-/I-/E-/S- 前缀
+                # privacy-filter labels may carry a B-/I-/E-/S- prefix
                 for prefix in ("B-", "I-", "E-", "S-"):
                     if label.startswith(prefix):
                         label = label[len(prefix):]
@@ -173,15 +177,16 @@ class LLMDetector:
                 if score < self.min_score:
                     continue
 
-                # pipeline 返回的 start/end 是 chunk 内的偏移
+                # The pipeline's start/end are offsets within the chunk
                 start = int(span.get("start", 0)) + offset
                 end = int(span.get("end", 0)) + offset
                 if end <= start:
                     continue
 
-                # 用原文索引取实际片段（比模型重建的字符串更可靠）
+                # Take the actual span by original-text index (more reliable than the
+                # string the model reconstructs)
                 entity_text = text[start:end]
-                # 去掉前后的空白和常见标点（不影响中间内容）
+                # Strip surrounding whitespace and common punctuation (does not touch the middle)
                 l_strip = len(entity_text) - len(entity_text.lstrip(" \t\n,，。；;"))
                 r_strip = len(entity_text) - len(entity_text.rstrip(" \t\n,，。；;"))
                 if l_strip:
@@ -191,18 +196,19 @@ class LLMDetector:
                 if len(entity_text) < 2:
                     continue
 
-                # 过滤全中文片段（模型中文召回不稳，容易错切）
+                # Filter out all-Chinese spans (the model's Chinese recall is unstable
+                # and prone to mis-segmentation)
                 if self.only_latin_spans and mapped == "person":
                     if not any(c.isascii() and c.isalnum() for c in entity_text):
                         continue
 
-                # 类型过滤
+                # Type filtering
                 if only_types and mapped not in only_types:
                     continue
                 if exclude_types and mapped in exclude_types:
                     continue
 
-                # 修正 start 到 entity_text 在原文中实际出现的位置
+                # Correct start to where entity_text actually appears in the original text
                 real_start = text.find(entity_text, start)
                 if real_start == -1:
                     real_start = start
@@ -220,12 +226,12 @@ class LLMDetector:
         items: List[Tuple[str, str, int]], text: str
     ) -> List[Tuple[str, str, int]]:
         """
-        修补模型边界丢字符的问题：
-          - phone: 尾部向后扩展到非 [数字/空格/-] 字符
-          - secret: 尾部向后扩展到非 [A-Za-z0-9_\\-] 字符
-          - account_number / bank_account: 同 secret
-          - website: 尾部扩展到空白/中文/右括号前
-        前向扩展不做（容易吞进前置关键词）。
+        Repair characters the model drops at span boundaries:
+          - phone: extend the tail forward up to the first non-[digit/space/-] character
+          - secret: extend the tail forward up to the first non-[A-Za-z0-9_\\-] character
+          - account_number / bank_account: same as secret
+          - website: extend the tail up to the next whitespace/Chinese/closing parenthesis
+        No backward extension (it tends to swallow the leading keyword).
         """
         import string
 
@@ -256,8 +262,9 @@ class LLMDetector:
         items: List[Tuple[str, str, int]], text: str
     ) -> List[Tuple[str, str, int]]:
         """
-        修复：website 后紧跟 secret 且 secret 以 :// 或 / 开头时，合并为 website。
-        模型经常把 'https' 标为 website，把后半段 '://host/path' 标为 secret。
+        Fix: when a website is immediately followed by a secret that starts with :// or /,
+        merge them into a single website.
+        The model often tags 'https' as website and the rest '://host/path' as secret.
         """
         if not items:
             return items
@@ -289,9 +296,9 @@ class LLMDetector:
         items: List[Tuple[str, str, int]], text: str, max_gap: int = 3
     ) -> List[Tuple[str, str, int]]:
         """
-        合并相邻的同类型片段（subword 碎片化的修补）。
+        Merge adjacent spans of the same type (repairs subword fragmentation).
         e.g. ('zhangsan@example', email, 100) + ('.com', email, 116) -> 'zhangsan@example.com'
-        只合并间隔 <= max_gap 且中间仅含标点/空格的片段。
+        Only merge spans separated by <= max_gap where the gap contains only punctuation/spaces.
         """
         if not items:
             return items
@@ -321,7 +328,7 @@ class LLMDetector:
         i = 0
         while i < len(text):
             end = min(i + max_chars, len(text))
-            # 尽量在换行/句号处切
+            # Try to cut at a line break or full stop
             if end < len(text):
                 for sep in ("\n\n", "\n", "。", ". "):
                     cut = text.rfind(sep, i, end)
@@ -347,7 +354,7 @@ class LLMDetector:
 
 
 def is_llm_enabled_via_env() -> bool:
-    """读取 LEGAL_ANONYMIZER_LLM 环境变量，便于脚本/启动器统一开关"""
+    """Read the LEGAL_ANONYMIZER_LLM environment variable for a unified script/launcher toggle."""
     return os.environ.get("LEGAL_ANONYMIZER_LLM", "").lower() in ("1", "true", "yes", "on")
 
 
@@ -356,8 +363,9 @@ _SHARED: Optional["LLMDetector"] = None
 
 def get_shared_detector(**kwargs) -> "LLMDetector":
     """
-    进程级共享 LLMDetector 单例。
-    Web UI 等场景每次请求都会新建 LegalAnonymizer，用这个函数避免重复加载 1.5GB 模型。
+    Process-level shared LLMDetector singleton.
+    Scenarios like the web UI build a new LegalAnonymizer on every request; this function
+    avoids reloading the 1.5GB model each time.
     """
     global _SHARED
     if _SHARED is None:

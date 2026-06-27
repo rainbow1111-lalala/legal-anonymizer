@@ -1,22 +1,25 @@
 """
 Chinese NER Detector (CLUENER)
-基于 uer/roberta-base-finetuned-cluener2020-chinese 的中文命名实体识别检测器
+A Chinese named-entity recognition detector built on
+uer/roberta-base-finetuned-cluener2020-chinese.
 
-CLUENER2020 标签体系（10 类）及本项目的处理策略：
-  name         → person       人名
-  company      → company      公司名
-  address      → full_address 地址
-  government   → government   政府机关
-  organization → institution  机构
-  position     → (默认丢弃)    职位；但"上官/司马/欧阳"等复姓模式会被合并到相邻 name
-  book         → (丢弃)        书名（《民法典》这类非 PII）
-  movie / game / scene → (丢弃) 非 PII 类别
+CLUENER2020 label set (10 classes) and how this project handles each:
+  name         -> person       person name
+  company      -> company      company name
+  address      -> full_address address
+  government   -> government   government agency
+  organization -> institution  institution
+  position     -> (dropped by default)  job title; but compound-surname patterns
+                  such as Shangguan / Sima / Ouyang are merged into the adjacent name
+  book         -> (dropped)    book titles (non-PII, e.g. the Civil Code)
+  movie / game / scene -> (dropped) non-PII categories
 
-设计要点：
-  1. 懒加载 + 进程级单例（复用 llm_detector 的模式）
-  2. 复姓粘合：CLUENER 有时会把复姓人名（如"司马XX"）切成 position="司马" + name="XX"，
-     本检测器在后处理里识别复姓并合并成完整人名
-  3. 误报过滤：书名、景点、电影等标签直接丢弃
+Design notes:
+  1. Lazy loading plus a process-level singleton (same pattern as llm_detector).
+  2. Compound-surname gluing: CLUENER sometimes splits a compound-surname name
+     (e.g. "Sima XX") into position="Sima" + name="XX". This detector recognizes
+     compound surnames in post-processing and merges them into a complete name.
+  3. False-positive filtering: book, scene, and movie labels are dropped outright.
 """
 
 from __future__ import annotations
@@ -29,14 +32,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_ID = "uer/roberta-base-finetuned-cluener2020-chinese"
 
-# CLUENER → 项目类型
+# CLUENER -> project type
 LABEL_MAP = {
     "name": "person",
     "company": "company",
     "address": "full_address",
     "government": "government",
     "organization": "institution",
-    # 以下默认丢弃（在 KEEP_POSITIONS 里单独处理 position）
+    # The following are dropped by default (position is handled separately)
     "position": None,
     "book": None,
     "movie": None,
@@ -44,7 +47,8 @@ LABEL_MAP = {
     "scene": None,
 }
 
-# CLUENER 常把复姓切成 position="上官"+name="文渊"，这里收录常见复姓做粘合
+# CLUENER often splits a compound surname into position="上官"+name="文渊";
+# this set lists common compound surnames used for the merge.
 COMPOUND_SURNAMES = {
     "欧阳", "太史", "端木", "上官", "司马", "东方", "独孤", "南宫",
     "万俟", "闻人", "夏侯", "诸葛", "尉迟", "公羊", "赫连", "澹台",
@@ -54,7 +58,7 @@ COMPOUND_SURNAMES = {
 
 
 class CNNERDetector:
-    """中文 NER 检测器（CLUENER），懒加载单例共享"""
+    """Chinese NER detector (CLUENER), shared as a lazy-loaded singleton."""
 
     def __init__(
         self,
@@ -66,10 +70,12 @@ class CNNERDetector:
     ):
         """
         Args:
-            min_score: CLUENER 上阈值稍高（0.7）以压低误报
-            keep_position: 是否保留 position 类型（默认丢弃；法律文书里"律师/法官"不算 PII）
-            max_chars: 分段长度。模型 max_position_embeddings=512，中文近 1 字 1 token，
-                       默认 400 留安全余量（含 [CLS]/[SEP]/OOV 等额外 token）
+            min_score: a slightly higher threshold (0.7) for CLUENER to reduce false positives
+            keep_position: whether to keep the position type (dropped by default; in legal
+                           documents, titles like "lawyer" or "judge" are not PII)
+            max_chars: chunk length. The model has max_position_embeddings=512, and Chinese is
+                       roughly one token per character, so 400 leaves a safety margin (for the
+                       extra [CLS]/[SEP]/OOV tokens)
         """
         self.model_id = model_id
         self.device = device
@@ -80,7 +86,7 @@ class CNNERDetector:
         self._pipeline = None
         self._load_error: Optional[str] = None
 
-    # ---------------- 懒加载 ----------------
+    # ---------------- Lazy loading ----------------
 
     def _ensure_loaded(self) -> bool:
         if self._pipeline is not None:
@@ -95,7 +101,7 @@ class CNNERDetector:
                 pipeline,
             )
         except ImportError as e:
-            self._load_error = f"缺少依赖：{e.name}。请先安装：pip install torch transformers"
+            self._load_error = f"Missing dependency: {e.name}. Install with: pip install torch transformers"
             logger.warning(self._load_error)
             return False
 
@@ -123,7 +129,7 @@ class CNNERDetector:
             )
             return True
         except Exception as e:
-            self._load_error = f"模型加载失败: {e}"
+            self._load_error = f"Model loading failed: {e}"
             logger.exception(self._load_error)
             return False
 
@@ -135,7 +141,7 @@ class CNNERDetector:
     def load_error(self) -> Optional[str]:
         return self._load_error
 
-    # ---------------- 检测 ----------------
+    # ---------------- Detection ----------------
 
     def detect(
         self,
@@ -175,10 +181,10 @@ class CNNERDetector:
                 raw_spans.append((entity_text, label, start))
             offset += len(chunk)
 
-        # 1. 复姓粘合：position=<复姓> + 紧邻 name → 合并成 person
+        # 1. Compound-surname gluing: position=<compound surname> + adjacent name -> merge into person
         merged = self._merge_compound_surname(raw_spans, text)
 
-        # 2. 标签映射 + 类型过滤
+        # 2. Label mapping plus type filtering
         results: List[Tuple[str, str, int]] = []
         for t, raw_label, p in merged:
             if raw_label == "position" and not self.keep_position:
@@ -195,17 +201,18 @@ class CNNERDetector:
             if exclude_types and mapped in exclude_types:
                 continue
 
-            # name/person 做一次基本过滤：去掉以停用词结尾的碎片
+            # Basic filtering for name/person: drop fragments ending in a stopword
             if mapped == "person" and t[-1] in "的了过是为与和或及在":
                 continue
 
-            # 丢弃纯英文/拉丁命中 —— CLUENER 是中文模型，对英文会乱报
-            # （实际测试：把 "company"/"Delaware" 这类普通词当成公司）
+            # Drop pure English/Latin hits. CLUENER is a Chinese model and mislabels English.
+            # (Observed in testing: it tags common words like "company"/"Delaware" as companies.)
             has_cjk = any("一" <= c <= "鿿" for c in t)
             if not has_cjk:
                 continue
 
-            # government/court 过滤：泛指名（第二审人民法院/原审人民法院等）不是具体机构
+            # government/court filtering: generic names (e.g. "second-instance court",
+            # "original-trial court") are not specific institutions
             if mapped in ("government", "court", "institution"):
                 generic_gov_court = {
                     "人民法院", "第一审人民法院", "第二审人民法院", "第三审人民法院",
@@ -214,7 +221,7 @@ class CNNERDetector:
                 }
                 if t in generic_gov_court:
                     continue
-                # "第X条/款/项/审XX" 开头的法规引用
+                # Statute references starting with "Article/Clause/Item/Instance X"
                 import re as _re
                 if _re.match(r'第[一二三四五六七八九十百千\d]+[条款项审]', t):
                     continue
@@ -227,7 +234,7 @@ class CNNERDetector:
     def _merge_compound_surname(
         spans: List[Tuple[str, str, int]], text: str
     ) -> List[Tuple[str, str, int]]:
-        """合并 position=<复姓> + 紧邻 name 为 name"""
+        """Merge position=<compound surname> + adjacent name into a single name."""
         if not spans:
             return spans
         spans = sorted(spans, key=lambda x: x[2])
@@ -241,7 +248,7 @@ class CNNERDetector:
                 and i + 1 < len(spans)
             ):
                 nt, nlbl, np_ = spans[i + 1]
-                # 严格相邻：position 的末尾 == name 的开头
+                # Strictly adjacent: the end of position == the start of name
                 if nlbl == "name" and (p + len(t)) == np_:
                     merged_text = text[p : np_ + len(nt)]
                     out.append((merged_text, "name", p))
