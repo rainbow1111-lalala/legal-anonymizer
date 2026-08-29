@@ -639,6 +639,38 @@ body {
           </select>
         </label>
       </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">
+          &#128302; 补充识别层（批量识别与最终脱敏使用相同设置）
+        </div>
+        <div class="llm-toggle">
+          <span style="font-size:18px">&#127464;&#127475;</span>
+          <label>
+            <strong>中文 NER</strong>（CLUENER）
+            <div class="llm-hint">{% if enable_cn_ner %}补充识别中文人名、公司和地址；首次使用需加载模型{% else %}未安装 NER 运行时，当前仅使用规则识别{% endif %}</div>
+          </label>
+          <div class="toggle-switch{% if enable_cn_ner %} on{% endif %}" id="batch-cn-llm-switch"{% if enable_cn_ner %} onclick="toggleBatchCnLlm()"{% endif %}></div>
+        </div>
+        {% if enable_openai %}
+        <div class="llm-toggle">
+          <span style="font-size:18px">&#127482;&#127480;</span>
+          <label>
+            <strong>英文隐私识别</strong>（OpenAI privacy-filter）
+            <div class="llm-hint">补充英文人名、地址、国际电话和密钥类信息</div>
+          </label>
+          <div class="toggle-switch" id="batch-llm-switch" onclick="toggleBatchLlm()"></div>
+        </div>
+        {% endif %}
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;">
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">本批次自定义敏感词</label>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:10px;">每行选择一种类型，再填写一个需要强制识别的具体词汇。</div>
+        <div style="display:grid;grid-template-columns:minmax(140px,190px) minmax(260px,1fr) 40px;gap:8px;padding:0 2px 6px;color:var(--text-2);font-size:12px;font-weight:600;">
+          <span>敏感信息类型</span><span>具体脱敏词汇</span><span></span>
+        </div>
+        <div id="batch-custom-entry-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button type="button" class="btn btn-outline" onclick="addBatchCustomEntryRow()" style="margin-top:10px;font-size:13px;padding:7px 12px;">＋ 添加一条敏感词</button>
+      </div>
     </div>
 
     <div id="batch-file-list" class="card hidden">
@@ -647,8 +679,52 @@ body {
       </div>
       <div id="batch-items"></div>
       <div style="display:flex;gap:10px;margin-top:14px;">
-        <button class="btn btn-primary" id="batch-start-btn" onclick="startBatch()">开始批量脱敏</button>
+        <button class="btn btn-primary" id="batch-analyze-btn" onclick="analyzeBatch()">&#128269; 识别并进入人工检查</button>
         <button class="btn btn-outline" onclick="resetBatch()">清空</button>
+      </div>
+    </div>
+
+    <div id="batch-analysis-progress" class="card hidden">
+      <div class="card-title">正在批量识别 <span id="batch-analysis-label" style="font-size:13px;color:var(--text-2);font-weight:400;"></span></div>
+      <div style="background:#f0f2f5;height:8px;border-radius:4px;overflow:hidden;margin-bottom:12px;">
+        <div id="batch-analysis-bar" style="background:var(--primary);height:100%;width:0%;transition:width .3s;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);">识别只生成待复核清单，此阶段不会改写文件。</div>
+    </div>
+
+    <div id="batch-review-card" class="card hidden">
+      <div class="card-title">
+        批次统一人工检查
+        <span id="batch-review-summary" style="font-size:13px;color:var(--text-2);font-weight:400;"></span>
+      </div>
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">
+        已将所有文件的自动识别结果按“类型＋词汇”合并；编辑或删除会应用到整个批次。
+      </div>
+      <div id="batch-review-findings"></div>
+      <div id="batch-review-abbreviation-section" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;">
+        <div style="font-size:14px;font-weight:700;margin-bottom:4px;">全称—简称对应检查</div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:10px;">确认后全称和简称使用关联但不同的占位符；删除对应关系不会删除这两个敏感词。</div>
+        <div id="batch-review-abbreviations"></div>
+      </div>
+      <div style="margin-top:14px;padding:12px;background:#f8f9fb;border:1px solid #e4e7ed;border-radius:8px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">人工补充整个批次的遗漏词</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select id="batch-review-add-type" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+            <option value="person">姓名</option><option value="company">公司</option>
+            <option value="address">地址</option><option value="project_name">项目名称</option>
+            <option value="contract_number">合同编号</option><option value="other">其他</option>
+          </select>
+          <input id="batch-review-add-name" type="text" placeholder="输入遗漏的完整词汇"
+                 style="flex:1;min-width:220px;padding:8px;border:1px solid #ddd;border-radius:6px;">
+          <button class="btn btn-outline" onclick="addBatchReviewEntity()">添加</button>
+        </div>
+        <div id="batch-review-custom-list" class="custom-entity-list"></div>
+      </div>
+      <div id="batch-review-errors" class="hidden" style="margin-top:12px;"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="batch-start-btn" onclick="startBatch()">确认总表并开始批量脱敏</button>
+        <button class="btn btn-outline" onclick="analyzeBatch()">按当前 NER 设置重新识别</button>
+        <button class="btn btn-outline" onclick="resetBatch()">取消批次</button>
       </div>
     </div>
 
@@ -661,14 +737,67 @@ body {
       </div>
       <div id="batch-progress-list"></div>
       <div id="batch-actions" class="hidden" style="display:flex;gap:10px;margin-top:14px;">
-        <button class="btn btn-primary" onclick="downloadBatch()">&#128229; 下载全部（zip）</button>
+        <button class="btn btn-primary" onclick="downloadBatch()">&#128229; 下载脱敏成果（zip）</button>
+        <button class="btn btn-outline" onclick="downloadBatchMapping()">&#128273; 单独下载还原字典</button>
+        <button class="btn btn-outline" onclick="showBatchRefine()">发现遗漏，继续脱敏</button>
         <button class="btn btn-outline" onclick="resetBatch()">处理新批次</button>
+      </div>
+      <div id="batch-mapping-note" class="hidden" style="margin-top:10px;font-size:12px;color:var(--text-2);">
+        成果 zip 不含还原字典。还原字典含全部敏感原文，只在本机保管，不要和脱敏文件一起发给外部。
+      </div>
+      <div id="batch-refine" class="hidden" style="margin-top:16px;padding:14px;background:#fffbe6;border:1px solid #ffe58f;border-radius:8px;">
+        <div style="font-weight:600;margin-bottom:6px;">补充遗漏敏感词</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:10px;">
+          新版本会从原文件重新生成，已有占位符编号保持不变。
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+          <select id="batch-refine-type" style="padding:8px 10px;border:1px solid #ddd;border-radius:6px;">
+            <option value="person">姓名</option>
+            <option value="company">公司</option>
+            <option value="address">地址</option>
+            <option value="project_name">项目名称</option>
+            <option value="contract_number">合同编号</option>
+            <option value="other">其他</option>
+          </select>
+          <textarea id="batch-refine-words" placeholder="每行一个遗漏词"
+                    style="flex:1;min-width:260px;min-height:80px;padding:8px;border:1px solid #ddd;border-radius:6px;resize:vertical;"></textarea>
+        </div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-top:8px;">
+          <input id="batch-refine-save" type="checkbox"> 同时保存到个人词典
+        </label>
+        <div style="display:flex;gap:10px;margin-top:10px;">
+          <button class="btn btn-primary" onclick="refineBatch()">生成下一版</button>
+          <button class="btn btn-outline" onclick="hideBatchRefine()">取消</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- ============== 还原面板 ============== -->
   <div id="restore-panel" class="hidden">
+    <div class="card">
+      <div class="card-title">批量还原为 Word</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:12px;">
+        选择多个脱敏后文件和同一批次的还原字典。Word 文件会保留原排版，其他格式将转换为 Word。
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label for="batch-restore-files" class="btn btn-outline">选择脱敏文件（可多选）</label>
+        <input id="batch-restore-files" type="file" multiple accept=".docx,.doc,.pdf,.txt,.md" style="display:none;"
+               onchange="updateBatchRestoreLabels()">
+        <span id="batch-restore-files-label" style="font-size:12px;color:var(--text-3);">未选择</span>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+        <label for="batch-restore-map" class="btn btn-outline">选择批次还原字典</label>
+        <input id="batch-restore-map" type="file" accept=".json" style="display:none;"
+               onchange="updateBatchRestoreLabels()">
+        <span id="batch-restore-map-label" style="font-size:12px;color:var(--text-3);">未选择</span>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="batch-restore-btn" class="btn btn-primary" onclick="batchRestoreToWord()">批量还原并下载 Word ZIP</button>
+      </div>
+      <div id="batch-restore-error" class="hidden" style="margin-top:10px;"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">脱敏还原</div>
       <div style="font-size:13px;color:var(--text-2);margin-bottom:14px;">
@@ -823,10 +952,10 @@ body {
           <div style="font-size:13px;color:var(--text-2);margin-bottom:6px;">OCR 引擎</div>
           <div class="radio-group">
             <label class="radio-item">
-              <input type="radio" name="ocr-engine" value="rapidocr" checked> ⚡ RapidOCR <span style="color:var(--text-3);font-size:12px">（快，默认）</span>
+              <input type="radio" name="ocr-engine" value="rapidocr"{% if enable_rapidocr %} checked{% else %} disabled{% endif %}> ⚡ RapidOCR <span style="color:var(--text-3);font-size:12px">（{% if enable_rapidocr %}快，默认{% else %}未安装{% endif %}）</span>
             </label>
             <label class="radio-item">
-              <input type="radio" name="ocr-engine" value="paddleocr"> 🎯 PaddleOCR <span style="color:var(--text-3);font-size:12px">（复杂排版更准，慢）</span>
+              <input type="radio" name="ocr-engine" value="paddleocr"{% if not enable_rapidocr and enable_paddleocr %} checked{% elif not enable_paddleocr %} disabled{% endif %}> 🎯 PaddleOCR <span style="color:var(--text-3);font-size:12px">（{% if enable_paddleocr %}复杂排版更准，慢{% else %}可选，未安装{% endif %}）</span>
             </label>
           </div>
         </div>
@@ -840,9 +969,9 @@ body {
             <span style="font-size:18px">&#127464;&#127475;</span>
             <label>
               <strong>中文 NER</strong>（CLUENER，~400MB）
-              <div class="llm-hint">补规则漏掉的中文人名/公司/地址，含复姓识别</div>
+              <div class="llm-hint">{% if enable_cn_ner %}补规则漏掉的中文人名/公司/地址，含复姓识别{% else %}未安装 NER 运行时，请重新运行 setup.sh{% endif %}</div>
             </label>
-            <div class="toggle-switch on" id="cn-llm-switch" onclick="toggleCnLlm()"></div>
+            <div class="toggle-switch{% if enable_cn_ner %} on{% endif %}" id="cn-llm-switch"{% if enable_cn_ner %} onclick="toggleCnLlm()"{% endif %}></div>
           </div>
           {% if enable_openai %}
           <div class="llm-toggle">
@@ -1092,13 +1221,19 @@ body {
 
 <script>
 // ==================== State ====================
+const capabilities = {
+  cnNer: {{ 'true' if enable_cn_ner else 'false' }},
+  openai: {{ 'true' if enable_openai else 'false' }},
+  rapidocr: {{ 'true' if enable_rapidocr else 'false' }},
+  paddleocr: {{ 'true' if enable_paddleocr else 'false' }},
+};
 let state = {
   sessionId: null,
   fileName: '',
   fileType: '',
   isPdf: false,
   useOcr: false,
-  useCnLlm: true,   // 默认开启（模型在首次启动时已预下载）
+  useCnLlm: capabilities.cnNer,
   useLlm: false,
   findings: {},
   typeNames: {},
@@ -1195,13 +1330,13 @@ function resetUpload() {
   state.sessionId = null;
   state.fileName = '';
   state.useOcr = false;
-  state.useCnLlm = false;
+  state.useCnLlm = capabilities.cnNer;
   state.useLlm = false;
   document.getElementById('file-selected').classList.add('hidden');
   document.getElementById('drop-zone').classList.remove('hidden');
   document.querySelector('.inbox-section').classList.remove('hidden');
   document.getElementById('ocr-switch').classList.remove('on');
-  document.getElementById('cn-llm-switch').classList.remove('on');
+  document.getElementById('cn-llm-switch').classList.toggle('on', capabilities.cnNer);
   document.getElementById('llm-switch')?.classList.remove('on');
   document.getElementById('ocr-scanned-notice').classList.add('hidden');
   document.getElementById('analyze-error').classList.add('hidden');
@@ -1215,11 +1350,13 @@ function toggleOCR() {
 }
 
 function toggleCnLlm() {
+  if (!capabilities.cnNer) return;
   state.useCnLlm = !state.useCnLlm;
   document.getElementById('cn-llm-switch').classList.toggle('on', state.useCnLlm);
 }
 
 function toggleLlm() {
+  if (!capabilities.openai) return;
   state.useLlm = !state.useLlm;
   document.getElementById('llm-switch')?.classList.toggle('on', state.useLlm);
 }
@@ -1228,7 +1365,10 @@ function toggleLlm() {
 let inboxOpen = true;
 
 // 页面加载时自动刷新 inbox
-document.addEventListener('DOMContentLoaded', () => { refreshInbox(); });
+document.addEventListener('DOMContentLoaded', () => {
+  refreshInbox();
+  ensureBatchCustomEntryRow();
+});
 
 function toggleInbox() {
   inboxOpen = !inboxOpen;
@@ -1308,7 +1448,8 @@ async function analyzeDocument() {
       body: JSON.stringify({
         session_id: state.sessionId,
         use_ocr: state.useOcr,
-        ocr_engine: (document.querySelector('input[name="ocr-engine"]:checked') || {}).value || 'rapidocr',
+        ocr_engine: (document.querySelector('input[name="ocr-engine"]:checked') || {}).value
+          || (capabilities.rapidocr ? 'rapidocr' : capabilities.paddleocr ? 'paddleocr' : 'tesseract'),
         use_cn_llm: state.useCnLlm,
         use_llm: state.useLlm,
       }),
@@ -1924,7 +2065,7 @@ async function clearUserDict() {
 function startOver() {
   state = {
     sessionId: null, fileName: '', fileType: '', isPdf: false,
-    useOcr: false, useCnLlm: false, useLlm: false,
+    useOcr: false, useCnLlm: capabilities.cnNer, useLlm: false,
     findings: {}, typeNames: {},
     customEntities: [], excludedEntities: [], currentStep: 1,
   };
@@ -1932,7 +2073,7 @@ function startOver() {
   document.getElementById('drop-zone').classList.remove('hidden');
   document.querySelector('.inbox-section').classList.remove('hidden');
   document.getElementById('ocr-switch').classList.remove('on');
-  document.getElementById('cn-llm-switch').classList.remove('on');
+  document.getElementById('cn-llm-switch').classList.toggle('on', capabilities.cnNer);
   document.getElementById('llm-switch')?.classList.remove('on');
   document.getElementById('custom-entities').innerHTML = '';
   document.getElementById('mapping-detail').classList.add('hidden');
@@ -1941,7 +2082,138 @@ function startOver() {
 }
 
 // ==================== Batch Mode ====================
-let batchState = { id: null, items: [], polling: null };
+let batchState = {
+  id: null, items: [], polling: null, version: 0,
+  useCnLlm: capabilities.cnNer, useLlm: false, review: null, analysisPolling: null
+};
+
+function toggleBatchCnLlm() {
+  if (!capabilities.cnNer) return;
+  batchState.useCnLlm = !batchState.useCnLlm;
+  document.getElementById('batch-cn-llm-switch').classList.toggle('on', batchState.useCnLlm);
+}
+
+function toggleBatchLlm() {
+  if (!capabilities.openai) return;
+  batchState.useLlm = !batchState.useLlm;
+  document.getElementById('batch-llm-switch')?.classList.toggle('on', batchState.useLlm);
+}
+
+function parseBatchEntries(textareaId, typeSelectId) {
+  const defaultType = document.getElementById(typeSelectId).value;
+  const raw = document.getElementById(textareaId).value || '';
+  const allowedTypes = new Set([
+    'person', 'company', 'address', 'project_name', 'contract_number', 'other',
+    'law_firm', 'institution', 'government', 'court', 'phone', 'email',
+    'id_card', 'bank_account', 'case_number', 'credit_code'
+  ]);
+  const entries = [];
+  const seen = new Set();
+  for (const line of raw.split(/\r?\n|[,，、]/)) {
+    const value = line.trim();
+    if (!value) continue;
+    const parts = value.split(/[|｜\t]/, 2).map(s => s.trim());
+    const type = parts.length === 2 && allowedTypes.has(parts[0]) ? parts[0] : defaultType;
+    const name = parts.length === 2 && allowedTypes.has(parts[0]) ? parts[1] : value;
+    if (!name) continue;
+    const key = type + '\u0000' + name;
+    if (!seen.has(key)) {
+      entries.push({ type, name });
+      seen.add(key);
+    }
+  }
+  return entries;
+}
+
+const batchCustomTypeOptions = [
+  ['person', '姓名'], ['company', '公司'], ['law_firm', '律师事务所'],
+  ['institution', '机构'], ['government', '政府机关'], ['court', '法院'],
+  ['address', '地址'], ['project_name', '项目名称'],
+  ['contract_number', '合同编号'], ['case_number', '案号'],
+  ['phone', '电话'], ['email', '邮箱'], ['id_card', '身份证号'],
+  ['bank_account', '银行账号'], ['credit_code', '统一社会信用代码'],
+  ['other', '其他'],
+];
+
+function addBatchCustomEntryRow(initialType = 'person', initialName = '') {
+  const container = document.getElementById('batch-custom-entry-rows');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'batch-custom-entry-row';
+  row.style.cssText = 'display:grid;grid-template-columns:minmax(140px,190px) minmax(260px,1fr) 40px;gap:8px;align-items:center;';
+
+  const select = document.createElement('select');
+  select.className = 'batch-custom-entry-type';
+  select.style.cssText = 'width:100%;padding:9px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;';
+  for (const [value, label] of batchCustomTypeOptions) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    option.selected = value === initialType;
+    select.appendChild(option);
+  }
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'batch-custom-entry-name';
+  input.value = initialName;
+  input.placeholder = '例如：张三、某某科技有限公司、启航项目';
+  input.maxLength = 500;
+  input.style.cssText = 'width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #ddd;border-radius:6px;';
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addBatchCustomEntryRow(select.value);
+      container.lastElementChild?.querySelector('.batch-custom-entry-name')?.focus();
+    }
+  });
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.title = '删除该词条';
+  remove.textContent = '×';
+  remove.style.cssText = 'width:34px;height:34px;border:1px solid #ddd;border-radius:6px;background:#fff;color:var(--error);font-size:20px;cursor:pointer;';
+  remove.addEventListener('click', () => {
+    if (container.children.length === 1) {
+      input.value = '';
+      select.value = 'person';
+      input.focus();
+    } else {
+      row.remove();
+    }
+  });
+
+  row.append(select, input, remove);
+  container.appendChild(row);
+}
+
+function ensureBatchCustomEntryRow() {
+  const container = document.getElementById('batch-custom-entry-rows');
+  if (container && !container.children.length) addBatchCustomEntryRow();
+}
+
+function collectBatchCustomEntries() {
+  const entries = [];
+  const seen = new Set();
+  document.querySelectorAll('#batch-custom-entry-rows .batch-custom-entry-row').forEach(row => {
+    const type = row.querySelector('.batch-custom-entry-type')?.value || 'other';
+    const name = row.querySelector('.batch-custom-entry-name')?.value.trim() || '';
+    if (!name) return;
+    const key = type + '\u0000' + name;
+    if (!seen.has(key)) {
+      entries.push({ type, name });
+      seen.add(key);
+    }
+  });
+  return entries;
+}
+
+function resetBatchCustomEntryRows() {
+  const container = document.getElementById('batch-custom-entry-rows');
+  if (!container) return;
+  container.replaceChildren();
+  addBatchCustomEntryRow();
+}
 
 function switchMode(mode) {
   const single = document.getElementById('single-mode-panel');
@@ -2172,12 +2444,440 @@ function renderBatchList() {
   document.getElementById('batch-items').innerHTML = html;
 }
 
+async function analyzeBatch() {
+  if (!batchState.id) return;
+  const entries = collectBatchCustomEntries();
+  const button = document.getElementById('batch-analyze-btn');
+  button.disabled = true;
+  try {
+    const r = await fetch('/api/batch/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        batch_id: batchState.id,
+        use_cn_llm: batchState.useCnLlm,
+        use_llm: batchState.useLlm,
+        ocr_engine: capabilities.rapidocr ? 'rapidocr' : capabilities.paddleocr ? 'paddleocr' : 'tesseract',
+        entries,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || '启动识别失败'); return; }
+    batchState.review = null;
+    document.getElementById('batch-analysis-progress').classList.remove('hidden');
+    document.getElementById('batch-review-card').classList.add('hidden');
+    pollBatchAnalysis();
+  } catch (e) {
+    alert('批量识别失败: ' + e.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function pollBatchAnalysis() {
+  if (!batchState.id) return;
+  try {
+    const r = await fetch(`/api/batch/status/${batchState.id}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || '查询识别进度失败');
+    const total = data.analysis_total || 0;
+    const done = data.analysis_done || 0;
+    const percent = total ? done / total * 100 : 0;
+    document.getElementById('batch-analysis-bar').style.width = percent.toFixed(1) + '%';
+    document.getElementById('batch-analysis-label').textContent =
+      `（${done}/${total} 完成 · ${percent.toFixed(0)}%）`;
+    if (data.analysis_running) {
+      batchState.analysisPolling = setTimeout(pollBatchAnalysis, 1200);
+      return;
+    }
+    batchState.items = data.items;
+    document.getElementById('batch-analysis-progress').classList.add('hidden');
+    initializeBatchReviews(data.items);
+  } catch (e) {
+    batchState.analysisPolling = setTimeout(pollBatchAnalysis, 2500);
+  }
+}
+
+function initializeBatchReviews(items) {
+  const entityMap = new Map();
+  const abbreviationMap = new Map();
+  const typeNames = {};
+  const errors = [];
+  for (const item of items) {
+    Object.assign(typeNames, item.type_names || {});
+    if (item.analysis_status === 'error') {
+      errors.push({ idx: item.idx, name: item.name, error: item.analysis_error || '识别失败' });
+      continue;
+    }
+    for (const [type, values] of Object.entries(item.findings || {})) {
+      for (const value of values) {
+        const name = value.text || value;
+        const key = type + '\u0000' + name;
+        let entity = entityMap.get(key);
+        if (!entity) {
+          entity = {
+            type, name, originalType: type, originalName: name,
+            fileIndices: [], occurrenceCount: 0, contexts: [],
+            editing: false, deleted: false,
+          };
+          entityMap.set(key, entity);
+        }
+        if (!entity.fileIndices.includes(item.idx)) entity.fileIndices.push(item.idx);
+        entity.occurrenceCount += Number(value.occurrence_count || 1);
+        const context = value.context || '';
+        if (context && !entity.contexts.includes(context) && entity.contexts.length < 3) {
+          entity.contexts.push(context);
+        }
+      }
+    }
+    for (const relation of item.abbreviations || []) {
+      const type = relation.type || 'company';
+      const fullName = relation.full_name || '';
+      const abbreviation = relation.abbreviation || '';
+      if (!fullName || !abbreviation) continue;
+      const key = type + '\u0000' + fullName + '\u0000' + abbreviation;
+      let row = abbreviationMap.get(key);
+      if (!row) {
+        row = {
+          type, fullName, abbreviation,
+          originalFullName: fullName, originalAbbreviation: abbreviation,
+          fileIndices: [], editing: false, deleted: false,
+        };
+        abbreviationMap.set(key, row);
+      }
+      if (!row.fileIndices.includes(item.idx)) row.fileIndices.push(item.idx);
+    }
+  }
+  batchState.review = {
+    entities: Array.from(entityMap.values()),
+    abbreviations: Array.from(abbreviationMap.values()),
+    customEntities: [], typeNames, errors,
+  };
+  document.getElementById('batch-review-summary').textContent =
+    `（${items.length} 个文件，合并后 ${entityMap.size} 项${errors.length ? `，${errors.length} 个识别失败` : ''}）`;
+  const errorEl = document.getElementById('batch-review-errors');
+  if (errors.length) {
+    errorEl.className = 'alert alert-error';
+    errorEl.textContent = '识别失败：' + errors.map(item => `${item.name}（${item.error}）`).join('；');
+    errorEl.classList.remove('hidden');
+  } else {
+    errorEl.classList.add('hidden');
+  }
+  document.getElementById('batch-review-card').classList.remove('hidden');
+  document.getElementById('batch-file-list').classList.add('hidden');
+  renderBatchReview();
+}
+
+function batchReviewTypeSelect(selected, elementId) {
+  const options = [...batchCustomTypeOptions];
+  if (!options.some(([value]) => value === selected)) {
+    options.push([selected, batchState.review?.typeNames?.[selected] || selected]);
+  }
+  return `<select id="${elementId}" class="entity-edit-input" style="max-width:170px;">` +
+    options.map(([value, label]) => `<option value="${escAttr(value)}"${value === selected ? ' selected' : ''}>${escHtml(label)}</option>`).join('') +
+    '</select>';
+}
+
+function renderBatchReview() {
+  const review = batchState.review;
+  const target = document.getElementById('batch-review-findings');
+  if (!review) { target.innerHTML = ''; return; }
+  const visible = review.entities
+    .map((entity, index) => ({ entity, index }))
+    .filter(row => !row.entity.deleted);
+  if (!visible.length) {
+    target.innerHTML = '<div style="padding:18px;text-align:center;color:var(--text-3);border:1px dashed var(--border);border-radius:8px;">批次中未保留自动识别项，可在下方补充。</div>';
+    renderBatchReviewCustom();
+    renderBatchAbbreviations();
+    return;
+  }
+  const groups = {};
+  visible.forEach(({ entity, index }) => {
+    (groups[entity.type] ||= []).push({ entity, index });
+  });
+  let html = '';
+  for (const [type, rows] of Object.entries(groups)) {
+    const typeName = review.typeNames[type] || type;
+    html += `<div class="entity-group"><div class="entity-group-header"><span>${escHtml(typeName)} (${escHtml(type)})</span><span class="entity-group-count">${rows.length}</span></div><div class="entity-list">`;
+    for (const row of rows) {
+      if (row.entity.editing) {
+        html += `<div class="entity-item" id="batch-review-entity-${row.index}">
+          <div class="entity-main">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${batchReviewTypeSelect(row.entity.type, `batch-review-edit-type-${row.index}`)}
+              <input class="entity-edit-input" style="flex:1;min-width:220px;" id="batch-review-edit-${row.index}" value="${escAttr(row.entity.name)}" maxlength="500"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();saveBatchReviewEntity(${row.index})}">
+            </div>
+            ${row.entity.contexts[0] ? `<div class="entity-context">…${escHtml(row.entity.contexts[0])}…</div>` : ''}
+          </div>
+          <div class="entity-actions">
+            <button class="entity-btn" onclick="saveBatchReviewEntity(${row.index})" style="color:var(--success);border-color:var(--success);">保存</button>
+            <button class="entity-btn" onclick="cancelEditBatchReviewEntity(${row.index})">取消</button>
+          </div>
+        </div>`;
+      } else {
+        const changed = row.entity.name !== row.entity.originalName || row.entity.type !== row.entity.originalType;
+        html += `<div class="entity-item" id="batch-review-entity-${row.index}">
+          <div class="entity-main"><div class="entity-value">${escHtml(row.entity.name)}${changed ? ' <span style="font-size:11px;color:var(--warning);">（已编辑）</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:3px;">${row.entity.fileIndices.length} 份文件 · ${row.entity.occurrenceCount} 次</div>
+          ${row.entity.contexts[0] ? `<div class="entity-context">…${escHtml(row.entity.contexts[0])}…</div>` : ''}</div>
+          <div class="entity-actions">
+            <button class="entity-btn" onclick="editBatchReviewEntity(${row.index})" title="修改识别词">编辑</button>
+            <button class="entity-btn entity-btn-del" onclick="deleteBatchReviewEntity(${row.index})" title="删除该识别词">删除</button>
+          </div>
+        </div>`;
+      }
+    }
+    html += '</div></div>';
+  }
+  target.innerHTML = html;
+  renderBatchReviewCustom();
+  renderBatchAbbreviations();
+}
+
+function editBatchReviewEntity(index) {
+  const review = batchState.review;
+  if (!review || !review.entities[index]) return;
+  review.entities[index].editing = true;
+  renderBatchReview();
+  document.getElementById(`batch-review-edit-${index}`)?.focus();
+}
+
+function saveBatchReviewEntity(index) {
+  const review = batchState.review;
+  if (!review || !review.entities[index]) return;
+  const previousName = review.entities[index].name;
+  const previousType = review.entities[index].type;
+  const input = document.getElementById(`batch-review-edit-${index}`);
+  const typeInput = document.getElementById(`batch-review-edit-type-${index}`);
+  const name = input?.value.trim() || '';
+  const type = typeInput?.value || review.entities[index].type;
+  if (!name) {
+    input?.focus();
+    return;
+  }
+  if (review.entities.some((entity, entityIndex) =>
+      entityIndex !== index && !entity.deleted && entity.type === type && entity.name === name)) {
+    alert('总表中已经存在相同类型和词汇');
+    return;
+  }
+  review.entities[index].name = name;
+  review.entities[index].type = type;
+  review.entities[index].editing = false;
+  for (const relation of review.abbreviations) {
+    if (relation.deleted || relation.type !== previousType) continue;
+    if (relation.fullName === previousName) relation.fullName = name;
+    if (relation.abbreviation === previousName) relation.abbreviation = name;
+    if (relation.fullName === name || relation.abbreviation === name) relation.type = type;
+  }
+  renderBatchReview();
+}
+
+function cancelEditBatchReviewEntity(index) {
+  const review = batchState.review;
+  if (!review || !review.entities[index]) return;
+  review.entities[index].editing = false;
+  renderBatchReview();
+}
+
+function deleteBatchReviewEntity(index) {
+  const review = batchState.review;
+  if (!review || !review.entities[index]) return;
+  const entity = review.entities[index];
+  entity.deleted = true;
+  for (const relation of review.abbreviations) {
+    if (
+      !relation.deleted && relation.type === entity.type
+      && (relation.fullName === entity.name || relation.abbreviation === entity.name)
+    ) {
+      relation.deleted = true;
+    }
+  }
+  renderBatchReview();
+}
+
+function addBatchReviewEntity() {
+  const review = batchState.review;
+  if (!review) return;
+  const type = document.getElementById('batch-review-add-type').value;
+  const input = document.getElementById('batch-review-add-name');
+  const name = input.value.trim();
+  if (!name) return;
+  if (!review.customEntities.some(entity => entity.type === type && entity.name === name)) {
+    review.customEntities.push({ type, name });
+  }
+  input.value = '';
+  renderBatchReviewCustom();
+}
+
+function removeBatchReviewCustom(index) {
+  const review = batchState.review;
+  if (!review) return;
+  review.customEntities.splice(index, 1);
+  renderBatchReviewCustom();
+}
+
+function renderBatchReviewCustom() {
+  const review = batchState.review;
+  const target = document.getElementById('batch-review-custom-list');
+  if (!review || !review.customEntities.length) {
+    target.innerHTML = '<span style="font-size:12px;color:var(--text-3);">尚未人工补充</span>';
+    return;
+  }
+  target.innerHTML = review.customEntities.map((entity, index) =>
+    `<span class="custom-tag">${escHtml(review.typeNames[entity.type] || entity.type)}: ${escHtml(entity.name)}<button onclick="removeBatchReviewCustom(${index})">×</button></span>`
+  ).join('');
+}
+
+function editBatchAbbreviation(index) {
+  const relation = batchState.review?.abbreviations?.[index];
+  if (!relation) return;
+  relation.editing = true;
+  renderBatchAbbreviations();
+}
+
+function saveBatchAbbreviation(index) {
+  const review = batchState.review;
+  const relation = review?.abbreviations?.[index];
+  if (!relation) return;
+  const fullName = document.getElementById(`batch-abbr-full-${index}`)?.value.trim() || '';
+  const abbreviation = document.getElementById(`batch-abbr-short-${index}`)?.value.trim() || '';
+  if (!fullName || !abbreviation || fullName === abbreviation) {
+    alert('请填写不同的全称和简称');
+    return;
+  }
+  for (const entity of review.entities) {
+    if (!entity.deleted && entity.type === relation.type && entity.name === relation.fullName) {
+      entity.name = fullName;
+    }
+    if (!entity.deleted && entity.type === relation.type && entity.name === relation.abbreviation) {
+      entity.name = abbreviation;
+    }
+  }
+  relation.fullName = fullName;
+  relation.abbreviation = abbreviation;
+  relation.editing = false;
+  renderBatchReview();
+}
+
+function cancelBatchAbbreviation(index) {
+  const relation = batchState.review?.abbreviations?.[index];
+  if (!relation) return;
+  relation.editing = false;
+  renderBatchAbbreviations();
+}
+
+function deleteBatchAbbreviation(index) {
+  const relation = batchState.review?.abbreviations?.[index];
+  if (!relation) return;
+  relation.deleted = true;
+  renderBatchAbbreviations();
+}
+
+function renderBatchAbbreviations() {
+  const review = batchState.review;
+  const section = document.getElementById('batch-review-abbreviation-section');
+  const target = document.getElementById('batch-review-abbreviations');
+  if (!review || !review.abbreviations.length) {
+    section.classList.add('hidden');
+    target.innerHTML = '';
+    return;
+  }
+  section.classList.remove('hidden');
+  const rows = review.abbreviations
+    .map((relation, index) => ({ relation, index }))
+    .filter(row => !row.relation.deleted);
+  if (!rows.length) {
+    target.innerHTML = '<span style="font-size:12px;color:var(--text-3);">未保留全称—简称对应关系。</span>';
+    return;
+  }
+  target.innerHTML = rows.map(({ relation, index }) => {
+    if (relation.editing) {
+      return `<div class="entity-item">
+        <div class="entity-main" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <input class="entity-edit-input" id="batch-abbr-full-${index}" value="${escAttr(relation.fullName)}" maxlength="500" style="flex:1;min-width:220px;">
+          <span style="color:var(--text-3);">→</span>
+          <input class="entity-edit-input" id="batch-abbr-short-${index}" value="${escAttr(relation.abbreviation)}" maxlength="500" style="flex:1;min-width:180px;">
+        </div>
+        <div class="entity-actions">
+          <button class="entity-btn" onclick="saveBatchAbbreviation(${index})" style="color:var(--success);border-color:var(--success);">保存</button>
+          <button class="entity-btn" onclick="cancelBatchAbbreviation(${index})">取消</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="entity-item">
+      <div class="entity-main">
+        <div class="entity-value">${escHtml(relation.fullName)} <span style="color:var(--text-3);margin:0 6px;">→</span> ${escHtml(relation.abbreviation)}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:3px;">${relation.fileIndices.length} 份文件</div>
+      </div>
+      <div class="entity-actions">
+        <button class="entity-btn" onclick="editBatchAbbreviation(${index})">编辑对应</button>
+        <button class="entity-btn entity-btn-del" onclick="deleteBatchAbbreviation(${index})">删除对应</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function dedupeBatchEntries(entries) {
+  const result = [];
+  const seen = new Set();
+  for (const entry of entries) {
+    const type = entry.type || 'other';
+    const name = (entry.name || '').trim();
+    if (!name) continue;
+    const key = type + '\u0000' + name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ type, name });
+  }
+  return result;
+}
+
 async function startBatch() {
   if (!batchState.id) return;
+  const review = batchState.review;
+  if (!review) return;
+  if (review.errors.length) {
+    alert(`仍有 ${review.errors.length} 个文件识别失败，请调整 NER/OCR 设置后重新识别。`);
+    return;
+  }
   const strategy = document.getElementById('batch-mask-strategy').value;
   const phStyle = (document.getElementById('batch-placeholder-style') || {}).value || 'english_bracket';
   const fmt = document.getElementById('batch-output-format').value;
   const formats = fmt === 'auto' ? null : [fmt];
+  const entries = collectBatchCustomEntries();
+  entries.push(...review.customEntities);
+  const deletedEntities = [];
+  for (const entity of review.entities) {
+    const changed = entity.name !== entity.originalName || entity.type !== entity.originalType;
+    if (entity.deleted || changed) {
+      deletedEntities.push({ type: entity.originalType, name: entity.originalName });
+    }
+    if (!entity.deleted && changed) {
+      entries.push({ type: entity.type, name: entity.name });
+    }
+  }
+  const abbreviationRelations = review.abbreviations
+    .filter(relation => !relation.deleted)
+    .map(relation => ({
+      type: relation.type,
+      full_name: relation.fullName,
+      abbreviation: relation.abbreviation,
+    }));
+  for (const relation of abbreviationRelations) {
+    entries.push({ type: relation.type, name: relation.full_name });
+    entries.push({ type: relation.type, name: relation.abbreviation });
+  }
+  const globalEntries = dedupeBatchEntries(entries);
+  const reviews = {};
+  for (const item of batchState.items) {
+    if (!item.idx) continue;
+    reviews[item.idx] = {
+      deleted_entities: deletedEntities,
+      edited_entities: [],
+      custom_entities: [],
+    };
+  }
   document.getElementById('batch-start-btn').disabled = true;
   try {
     const r = await fetch('/api/batch/start', {
@@ -2188,12 +2888,19 @@ async function startBatch() {
         mask_strategy: strategy,
         placeholder_style: phStyle,
         output_formats: formats,
+        entries: globalEntries,
+        reviews,
+        abbreviation_relations: abbreviationRelations,
+        use_cn_llm: batchState.useCnLlm,
+        use_llm: batchState.useLlm,
       }),
     });
     const data = await r.json();
     if (!r.ok) { alert(data.error || '启动失败'); document.getElementById('batch-start-btn').disabled = false; return; }
+    batchState.version = data.version || 1;
     document.getElementById('batch-progress').classList.remove('hidden');
     document.getElementById('batch-file-list').classList.add('hidden');
+    document.getElementById('batch-review-card').classList.add('hidden');
     pollBatch();
   } catch (e) {
     alert('启动失败: ' + e.message);
@@ -2221,6 +2928,7 @@ async function pollBatch() {
     } else {
       if (batchState.tickTimer) { clearInterval(batchState.tickTimer); batchState.tickTimer = null; }
       document.getElementById('batch-actions').classList.remove('hidden');
+      document.getElementById('batch-mapping-note').classList.remove('hidden');
     }
   } catch (e) {
     batchState.polling = setTimeout(pollBatch, 3000);
@@ -2262,7 +2970,8 @@ function renderBatchProgress(data) {
   const overall = data.items.length ? avgPercent / data.items.length : 0;
   document.getElementById('batch-progress-bar').style.width = overall.toFixed(1) + '%';
 
-  let label = `（${data.done}/${data.total} 完成 · ${overall.toFixed(0)}%）`;
+  batchState.version = data.version || batchState.version || 1;
+  let label = `（V${batchState.version} · ${data.done}/${data.total} 完成 · ${overall.toFixed(0)}%）`;
   if (!data.all_finished && pendingTotalSec > 0) {
     label += ` · 预计还需 ${_fmtDuration(pendingTotalSec)}`;
   }
@@ -2316,16 +3025,121 @@ function downloadBatch() {
   window.location.href = `/api/batch/download/${batchState.id}`;
 }
 
+function downloadBatchMapping() {
+  if (!batchState.id) return;
+  window.location.href = `/api/batch/mapping/${batchState.id}`;
+}
+
+function showBatchRefine() {
+  document.getElementById('batch-refine').classList.remove('hidden');
+  document.getElementById('batch-refine-words').focus();
+}
+
+function hideBatchRefine() {
+  document.getElementById('batch-refine').classList.add('hidden');
+}
+
+async function refineBatch() {
+  if (!batchState.id) return;
+  const entries = parseBatchEntries('batch-refine-words', 'batch-refine-type');
+  if (!entries.length) {
+    alert('请至少输入一个遗漏敏感词');
+    return;
+  }
+  try {
+    const r = await fetch('/api/batch/refine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        batch_id: batchState.id,
+        entries,
+        save_to_user_dict: document.getElementById('batch-refine-save').checked,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || '补充脱敏启动失败'); return; }
+    batchState.version = data.version;
+    document.getElementById('batch-refine-words').value = '';
+    document.getElementById('batch-refine').classList.add('hidden');
+    document.getElementById('batch-actions').classList.add('hidden');
+    document.getElementById('batch-mapping-note').classList.add('hidden');
+    pollBatch();
+  } catch (e) {
+    alert('补充脱敏失败: ' + e.message);
+  }
+}
+
 function resetBatch() {
   if (batchState.polling) clearTimeout(batchState.polling);
   if (batchState.tickTimer) clearInterval(batchState.tickTimer);
-  batchState = { id: null, items: [], polling: null, tickTimer: null };
+  if (batchState.analysisPolling) clearTimeout(batchState.analysisPolling);
+  batchState = {
+    id: null, items: [], polling: null, tickTimer: null, version: 0,
+    useCnLlm: capabilities.cnNer, useLlm: false, review: null, analysisPolling: null
+  };
   document.getElementById('batch-file-list').classList.add('hidden');
   document.getElementById('batch-options').classList.add('hidden');
+  document.getElementById('batch-analysis-progress').classList.add('hidden');
+  document.getElementById('batch-review-card').classList.add('hidden');
   document.getElementById('batch-progress').classList.add('hidden');
   document.getElementById('batch-actions').classList.add('hidden');
+  document.getElementById('batch-mapping-note').classList.add('hidden');
   document.getElementById('batch-start-btn').disabled = false;
+  document.getElementById('batch-analyze-btn').disabled = false;
+  document.getElementById('batch-cn-llm-switch').classList.toggle('on', capabilities.cnNer);
+  document.getElementById('batch-llm-switch')?.classList.remove('on');
   document.getElementById('batch-file-input').value = '';
+  resetBatchCustomEntryRows();
+  document.getElementById('batch-refine-words').value = '';
+  document.getElementById('batch-refine').classList.add('hidden');
+}
+
+function updateBatchRestoreLabels() {
+  const files = document.getElementById('batch-restore-files').files;
+  const map = document.getElementById('batch-restore-map').files[0];
+  document.getElementById('batch-restore-files-label').textContent =
+    files.length ? `已选择 ${files.length} 个文件` : '未选择';
+  document.getElementById('batch-restore-map-label').textContent =
+    map ? map.name : '未选择';
+}
+
+async function batchRestoreToWord() {
+  const files = document.getElementById('batch-restore-files').files;
+  const mapping = document.getElementById('batch-restore-map').files[0];
+  const errorEl = document.getElementById('batch-restore-error');
+  errorEl.classList.add('hidden');
+  if (!files.length || !mapping) {
+    errorEl.className = 'alert alert-error';
+    errorEl.textContent = '请同时选择脱敏文件和批次还原字典';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  const button = document.getElementById('batch-restore-btn');
+  button.disabled = true;
+  button.textContent = '正在还原...';
+  try {
+    const fd = new FormData();
+    for (const file of files) fd.append('files', file);
+    fd.append('mapping', mapping);
+    const response = await fetch('/api/batch/restore', { method: 'POST', body: fd });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || '批量还原失败');
+    }
+    const blob = await response.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '批量还原Word.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } catch (e) {
+    errorEl.className = 'alert alert-error';
+    errorEl.textContent = e.message;
+    errorEl.classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+    button.textContent = '批量还原并下载 Word ZIP';
+  }
 }
 
 // ==================== Utilities ====================

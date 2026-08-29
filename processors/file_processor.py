@@ -663,6 +663,28 @@ class FileProcessor:
             traceback.print_exc()
             return False
 
+    def restore_docx_inplace(self, input_path: str, output_path: str, mapping_data: dict) -> bool:
+        """在保留 Word 原始排版的前提下，将占位符反向替换为原文。
+
+        ``mapping_data`` 可以是完整字典，也可以是
+        ``{placeholder: {type, original}}`` 或 ``{placeholder: original}``。
+        """
+        if not isinstance(mapping_data, dict):
+            return False
+        if isinstance(mapping_data.get('mapping'), dict):
+            mapping_data = mapping_data['mapping']
+
+        reverse_mapping = {}
+        for placeholder, info in mapping_data.items():
+            if isinstance(info, dict):
+                original = info.get('original', '')
+            else:
+                original = str(info or '')
+            if placeholder and original:
+                reverse_mapping[('restore', placeholder)] = original
+
+        return self.anonymize_docx_inplace(input_path, output_path, reverse_mapping)
+
     def _extract_plain_text(self, file_path: str) -> str:
         """从纯文本文件提取（自动尝试常见中文编码）"""
         for enc in ('utf-8-sig', 'utf-8', 'gbk', 'gb18030'):

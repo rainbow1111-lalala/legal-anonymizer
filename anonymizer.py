@@ -192,11 +192,39 @@ class LegalAnonymizer:
         Returns:
             合并后的实体列表 [(实体文本, 类型, 位置), ...]
         """
+        # 用户明确指定的词条优先级最高。EntityDetector 内部原本会
+        # 按长度合并手工与自动结果，可能让较长的误判覆盖手工词条。
+        custom_entities = []
+        for entity_type, names in self.entity_detector.entities.items():
+            if only_types and entity_type not in only_types:
+                continue
+            if exclude_types and entity_type in exclude_types:
+                continue
+            for name in names:
+                start = 0
+                while name:
+                    pos = text.find(name, start)
+                    if pos < 0:
+                        break
+                    custom_entities.append((name, entity_type, pos))
+                    start = pos + len(name)
+
+        custom_spans = [(p, p + len(t)) for t, _, p in custom_entities]
+
+        def not_overlapping_custom(entity):
+            value, _, pos = entity
+            end = pos + len(value)
+            return not any(pos < custom_end and end > custom_start
+                           for custom_start, custom_end in custom_spans)
+
         pattern_entities = self.pattern_detector.detect(text, only_types, exclude_types)
         entity_entities = self.entity_detector.detect(text, only_types, exclude_types)
         self.masker.set_abbreviation_map(self.entity_detector.abbreviation_map)
 
-        merged = pattern_entities + entity_entities
+        merged = custom_entities + [
+            entity for entity in (pattern_entities + entity_entities)
+            if not_overlapping_custom(entity)
+        ]
 
         # --- 第 3 层：CN NER 融合（带仲裁）---
         if self.use_cn_llm and self.cn_ner_detector is not None:
@@ -234,6 +262,15 @@ class LegalAnonymizer:
         # 对识别到的公司/律所/机构名，提取去除前后缀后的核心品牌词
         # 在全文中查找其单独出现位置，加入实体列表
         merged = self._add_distinctive_part_entities(text, merged)
+
+        # 扩展步骤也可能新增与手工词条重叠的长实体；返回前再次
+        # 巩固“手工词典优先”规则。
+        if custom_entities:
+            custom_keys = {(t, ty, p) for t, ty, p in custom_entities}
+            merged = custom_entities + [
+                entity for entity in merged
+                if entity not in custom_keys and not_overlapping_custom(entity)
+            ]
 
         return merged
 
@@ -639,6 +676,9 @@ class LegalAnonymizer:
         save_text_backup: bool = True,
         save_mapping: bool = True,
         pdf_whitebox: bool = False,
+        initial_mapping: Dict = None,
+        excluded_entities: List[Dict] = None,
+        abbreviation_relations: List[Dict] = None,
     ) -> Dict:
         """
         脱敏文件
@@ -656,6 +696,11 @@ class LegalAnonymizer:
             ocr_engine: OCR 引擎 'rapidocr'（默认）| 'paddleocr'（慢但精准）| 'tesseract'
             save_text_backup: 是否保存文本备份
             save_mapping: 是否保存映射表
+            initial_mapping: 批次前序文件/旧版本已分配的映射，
+                             用于保持占位符稳定
+            excluded_entities: 人工复核后明确排除的实体
+            abbreviation_relations: 批量人工复核确认的简称关系。
+                                    传入列表时覆盖自动关系；空列表表示不使用简称关联。
 
         Returns:
             结果字典
@@ -681,9 +726,35 @@ class LegalAnonymizer:
 
         # 一次检测，同时用于分析和脱敏（避免重复检测）
         self.masker.reset()
+        if initial_mapping:
+            self.masker.seed_mapping(initial_mapping)
         all_entities = self._detect_all(content, only_types, exclude_types)
+        if abbreviation_relations is not None:
+            reviewed_abbreviations = {}
+            for relation in abbreviation_relations:
+                if not isinstance(relation, dict):
+                    continue
+                full_name = str(relation.get('full_name', '')).strip()
+                abbreviation = str(relation.get('abbreviation', '')).strip()
+                if full_name and abbreviation and full_name != abbreviation:
+                    reviewed_abbreviations[abbreviation] = full_name
+            self.entity_detector.abbreviation_map = reviewed_abbreviations
+            self.masker.set_abbreviation_map(reviewed_abbreviations)
+        if excluded_entities:
+            excluded_set = {
+                (str(item.get('type', '')), str(item.get('name', '')))
+                for item in excluded_entities if isinstance(item, dict)
+            }
+            all_entities = [
+                entity for entity in all_entities
+                if (entity[1], entity[0]) not in excluded_set
+            ]
         analysis = self._build_analysis(all_entities)
-        anonymized_content, detailed_mapping = self.masker.mask_all(content, all_entities)
+        anonymized_content, detailed_mapping = self.masker.mask_all(
+            content,
+            all_entities,
+            preserve_mapping=bool(initial_mapping),
+        )
 
         # 准备结果
         result_info = {

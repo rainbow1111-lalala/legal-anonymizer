@@ -116,7 +116,7 @@ class EntityDetector:
     def __init__(self):
         self.entities = {}
         self._auto_detect_enabled = True
-        self.abbreviation_map = {}  # 简称 -> 全称
+        self.abbreviation_map = {}  # 简称 -> 全称（掩码时使用关联但不同的占位符）
 
     def add_entity(self, entity_type: str, name: str):
         """
@@ -650,57 +650,128 @@ class EntityDetector:
                     if self._is_valid_name(candidate):
                         detected.add((candidate, 'person'))
 
-        # ========== 3. 简称追踪（以下简称"XXX"） ==========
+        # ========== 3. 简称追踪 ==========
+        # 对已确认的全称逐个定位：如果其后 20 个字符内出现规范简称声明，
+        # 将引号内文本登记为简称。这样既支持自动识别到的全称，也支持
+        # 用户手工添加的敏感词。
         self.abbreviation_map = {}
-        abbrev_pattern = re.compile(
-            r'([\u4e00-\u9fa5（()）\w]{4,50})'
-            r'\s*[（(]\s*以下简称\s*'
-            r'["\u201c]([^"\u201d]{1,20})["\u201d]'
-            r'(?:\s*(?:或|、)\s*["\u201c]([^"\u201d]{1,20})["\u201d])?'
-            r'\s*[）)]'
+        abbreviation_bases = set(detected)
+        for entity_type, names in self.entities.items():
+            if not self._should_detect(entity_type, only_types, exclude_types):
+                continue
+            abbreviation_bases.update(
+                (name, entity_type) for name in names if name
+            )
+
+        # 不接受单独的“称”，以免把“某公司称‘市场环境……’”误判为简称。
+        # “称为”仅在全称后直接跟标点/括号时接受；其它触发词本身已明确
+        # 表达简称关系。
+        strong_trigger = r'(?:以下简称|以下称为|以下称|下称|简称|统称)'
+        strong_pattern = re.compile(
+            rf'(?P<trigger>{strong_trigger})\s*'
+            r'["\u201c\u300c](?P<abbr>[^"\u201d\u300d\n。；;]{1,20})["\u201d\u300d]'
+            r'(?:\s*(?:或|、)\s*["\u201c\u300c]'
+            r'(?P<abbr2>[^"\u201d\u300d\n。；;]{1,20})["\u201d\u300d])?'
         )
-        for match in abbrev_pattern.finditer(text):
-            full_name = match.group(1).strip()
-            abbrevs = [match.group(2)]
-            if match.group(3):
-                abbrevs.append(match.group(3))
+        direct_called_pattern = re.compile(
+            r'^[\s（(，,：:]*(?P<trigger>称为)\s*'
+            r'["\u201c\u300c](?P<abbr>[^"\u201d\u300d\n。；;]{1,20})["\u201d\u300d]'
+        )
 
-            # 查找全称对应的实体类型
-            full_type = None
-            for name, etype in detected:
-                if name == full_name or full_name.endswith(name) or name.endswith(full_name):
-                    full_type = etype
-                    full_name = name  # 使用已检测到的规范全称
+        claim_candidates = []
+        for full_name, full_type in sorted(
+            abbreviation_bases, key=lambda item: len(item[0]), reverse=True
+        ):
+            search_start = 0
+            while full_name:
+                full_pos = text.find(full_name, search_start)
+                if full_pos < 0:
                     break
+                full_end = full_pos + len(full_name)
+                tail = text[full_end:full_end + 80]
+                boundary_positions = [
+                    pos for pos in (tail.find('。'), tail.find('；'), tail.find(';'), tail.find('\n'))
+                    if pos >= 0
+                ]
+                boundary = min(boundary_positions) if boundary_positions else len(tail)
+                local_tail = tail[:boundary]
 
-            for abbrev in abbrevs:
-                if abbrev in self.GENERIC_ABBREVIATIONS:
-                    continue
-                if full_type:
-                    self.abbreviation_map[abbrev] = full_name
-                    detected.add((abbrev, full_type))
+                match = strong_pattern.search(local_tail)
+                called_char_pos = (
+                    match.start('trigger') + match.group('trigger').find('称')
+                    if match else -1
+                )
+                if (
+                    match
+                    and called_char_pos < 20
+                    and local_tail.find('称') == called_char_pos
+                ):
+                    abbrevs = [match.group('abbr')]
+                    if match.group('abbr2'):
+                        abbrevs.append(match.group('abbr2'))
+                    trigger_pos = full_end + called_char_pos
+                    distance = called_char_pos
                 else:
-                    # 全称未被检测到 → 看 abbrev 本身（往往是干净的专名）
-                    if any(full_name.endswith(s) for s in ORG_SUFFIXES):
-                        self.abbreviation_map[abbrev] = full_name
-                        detected.add((full_name, 'company'))
-                        detected.add((abbrev, 'company'))
-                    elif 2 <= len(abbrev) <= 8 and re.fullmatch(r'[一-龥]+', abbrev):
-                        # 兜底：abbrev 是 2-8 个纯中文字符（排除 GENERIC 之后的专名），
-                        # 即使全称不是标准 ORG_SUFFIX 结尾（如纪念馆、故居研究会等机构）
-                        # 也加入为 institution 类型
-                        # 同时尝试从 full_name 尾部提取干净的实体名
-                        cjk_tail = re.search(r'[一-龥]{2,16}$', full_name)
-                        clean_full = cjk_tail.group(0) if cjk_tail else full_name
-                        # 去掉常见动词前缀
-                        for v in ('现受', '本受', '受', '本', '即', '即受'):
-                            if clean_full.startswith(v) and len(clean_full) > len(v) + 1:
-                                clean_full = clean_full[len(v):]
-                                break
-                        self.abbreviation_map[abbrev] = clean_full
-                        detected.add((abbrev, 'institution'))
-                        if clean_full and clean_full != abbrev and len(clean_full) >= 3:
-                            detected.add((clean_full, 'institution'))
+                    # “称为”比“以下简称”歧义更大，只允许紧邻全称的写法。
+                    direct_match = direct_called_pattern.match(local_tail[:40])
+                    direct_called_pos = (
+                        direct_match.start('trigger') if direct_match else -1
+                    )
+                    if (
+                        direct_match
+                        and direct_called_pos < 20
+                        and local_tail.find('称') == direct_called_pos
+                    ):
+                        abbrevs = [direct_match.group('abbr')]
+                        trigger_pos = full_end + direct_called_pos
+                        distance = direct_called_pos
+                    else:
+                        abbrevs = []
+                        trigger_pos = full_end
+                        distance = 0
+
+                for abbrev in abbrevs:
+                    abbrev = abbrev.strip()
+                    if not abbrev or abbrev == full_name:
+                        continue
+                    if abbrev in self.GENERIC_ABBREVIATIONS:
+                        continue
+                    claim_candidates.append({
+                        'abbreviation': abbrev,
+                        'trigger_pos': trigger_pos,
+                        'distance': distance,
+                        'full_name': full_name,
+                        'full_type': full_type,
+                    })
+
+                search_start = full_end
+
+        # 同一个简称声明可能落入多个相邻实体的 20 字窗口；先为每个声明
+        # 选择距离最近的全称。若文中确实把同一简称定义给不同全称，则不
+        # 自动绑定，避免错误关联。
+        nearest_claims = {}
+        for claim in claim_candidates:
+            key = (claim['abbreviation'], claim['trigger_pos'])
+            current = nearest_claims.get(key)
+            if current is None or claim['distance'] < current['distance']:
+                nearest_claims[key] = claim
+            elif (
+                claim['distance'] == current['distance']
+                and len(claim['full_name']) > len(current['full_name'])
+            ):
+                nearest_claims[key] = claim
+
+        claims_by_abbreviation = {}
+        for claim in nearest_claims.values():
+            claims_by_abbreviation.setdefault(claim['abbreviation'], []).append(claim)
+
+        for abbrev, claims in claims_by_abbreviation.items():
+            claimed_full_names = {claim['full_name'] for claim in claims}
+            if len(claimed_full_names) != 1:
+                continue
+            claim = min(claims, key=lambda item: item['distance'])
+            self.abbreviation_map[abbrev] = claim['full_name']
+            detected.add((abbrev, claim['full_type']))
 
         # ========== 4. 签名处连写人名拆分 ==========
         if self._should_detect('person', only_types, exclude_types):
@@ -811,6 +882,13 @@ class EntityDetector:
         legal_roles = [
             '原告', '被告', '申请人', '被申请人', '上诉人', '被上诉人',
             '第三人', '法定代表人', '负责人', '代理人', '委托人',
+            # 合同/文书常见引导语（不切走会把这些字并进机构名）
+            '甲方', '乙方', '丙方', '丁方', '双方', '各方', '本方', '我方',
+            '对方', '买方', '卖方', '出租方', '承租方', '发包方', '承包方',
+            '受让方', '转让方', '委托方', '受托方', '付款方', '收款方',
+            '供货方', '需方', '供方', '债权人', '债务人', '担保人', '保证人',
+            '本院认为', '本所认为', '经审理查明', '查明', '认为',
+            '案涉工程由', '案涉',
             '追加', '变更为', '转让给', '出售给', '支付给', '通知',
             '判令', '裁令', '责令', '命令', '要求',
             '诉', '起诉', '上诉', '应诉',
@@ -859,7 +937,7 @@ class EntityDetector:
         if best_cut > 0:
             trimmed = prefix[best_cut:]
             # 去掉切割后残留的虚词前缀（如"持有的XX" → "的XX" → "XX"）
-            leading_particles = '的了过在以为与和或及是则'
+            leading_particles = '的了过在以为与和或及是则系另暨并'
             while trimmed and trimmed[0] in leading_particles:
                 trimmed = trimmed[1:]
             if len(trimmed) >= 2:
@@ -871,7 +949,7 @@ class EntityDetector:
         break_chars = (
             '的了过把将被让给在向从对与和或及是为由于到至以但却而且也又还'
             '要会可等则诉请求按照根据依照鉴于经因故系不称简小见'
-            '受得入需改收并指号书'
+            '受得入需改收并指号书另暨'
             '人方'
         )
 
@@ -881,10 +959,15 @@ class EntityDetector:
                 last_break = i
 
         if last_break >= 0:
+            # 断词字符同样大量出现在真实企业字号里（和风、东方、长风数据、
+            # 在线、书香、可可西里……）。只有被丢弃的那一段整体都是虚词或
+            # 动词时才切割；否则保留完整匹配，宁可多覆盖也不漏。
+            discarded = prefix[:last_break + 1]
             trimmed_prefix = prefix[last_break + 1:]
-            if len(trimmed_prefix) >= 2:
-                return trimmed_prefix + suffix
-            return ''
+            if all(ch in break_chars for ch in discarded):
+                if len(trimmed_prefix) >= 2:
+                    return trimmed_prefix + suffix
+                return ''
 
         # 第三步：律师事务所城市列表修剪
         # 处理OCR/文本提取中城市名被连接到律师事务所前缀的情况

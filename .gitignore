@@ -50,7 +50,9 @@ output/*
 !output/.gitkeep
 uploads/*
 !uploads/.gitkeep
-test/cases/
+# 客户底稿衍生的用例不入库；public_ 前缀的合成用例作为回归基线跟踪
+test/cases/*
+!test/cases/public_*.json
 test/snapshots/
 test/samples/
 

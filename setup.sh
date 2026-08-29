@@ -1,139 +1,191 @@
 #!/bin/bash
-# ============================================================
-# 法律文件脱敏工具 - 全自动环境安装
-# 用法: bash setup.sh  （或由启动器自动调用，无需手动运行）
-# ============================================================
-# 安装策略（自动选择）:
-#   1. 如果已有 .venv → 跳过，直接结束
-#   2. 如果系统有 Python 3.9+ → 用系统 Python 创建 venv
-#   3. 如果有 uv → 用 uv 下载 Python 并创建 venv
-#   4. 如果有 Homebrew → brew install python@3.11
-#   5. 自动安装 uv（无需管理员权限），再用 uv 下载 Python
-# ============================================================
+# 法律文件脱敏工具 - macOS/Linux 环境安装
+# 基础组件失败时立即停止；OCR/NER 分组安装并单独报告。
+
+set -u
+set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv"
 LOG="$SCRIPT_DIR/.setup.log"
+MIN_PY_MAJOR=3
+MIN_PY_MINOR=10
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 ok()   { echo -e "${GREEN}  ✓ $*${NC}"; }
 info() { echo -e "${YELLOW}  … $*${NC}"; }
+warn() { echo -e "${YELLOW}  ! $*${NC}"; }
 err()  { echo -e "${RED}  ✗ $*${NC}"; }
 
+: > "$LOG"
+{
+    echo "setup started: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "platform: $(uname -s) $(uname -m)"
+} >> "$LOG"
+
 echo ""
-echo "  ╔══════════════════════════════════════╗"
-echo "  ║   法律文件脱敏工具 - 环境自动安装    ║"
-echo "  ╚══════════════════════════════════════╝"
+echo "  ╭────────────────────────────────────╮"
+echo "  │   法律文件脱敏工具 - 环境自动安装    │"
+echo "  ╰────────────────────────────────────╯"
 echo ""
 
-# ── 0. 如果已安装，跳过 ──────────────────────────────────────
-if [ -f "$VENV_DIR/bin/python" ]; then
-    # 验证关键依赖还在
-    if "$VENV_DIR/bin/python" -c "import flask, fitz, docx" 2>/dev/null; then
-        ok "环境已就绪，跳过安装"
-        echo ""
-        exit 0
+python_is_compatible() {
+    "$1" -c "import sys; sys.exit(0 if sys.version_info >= ($MIN_PY_MAJOR,$MIN_PY_MINOR) else 1)" \
+        >/dev/null 2>&1
+}
+
+core_is_ready() {
+    "$1" -c "import flask, fitz, docx, PIL, reportlab" >/dev/null 2>&1
+}
+
+ocr_is_ready() {
+    "$1" -c "import rapidocr, onnxruntime" >/dev/null 2>&1
+}
+
+ai_is_ready() {
+    "$1" -c "import torch, transformers" >/dev/null 2>&1
+}
+
+backup_venv() {
+    if [ -d "$VENV_DIR" ]; then
+        local backup="$SCRIPT_DIR/.venv.incompatible.$(date '+%Y%m%d-%H%M%S')"
+        info "旧运行环境不兼容，正在备份为 $(basename "$backup")"
+        if ! mv "$VENV_DIR" "$backup" >> "$LOG" 2>&1; then
+            err "无法备份旧环境，请关闭正在运行的工具后重试"
+            return 1
+        fi
     fi
-    info "环境不完整，重新安装依赖..."
-    SKIP_VENV_CREATE=1
+}
+
+# 已有环境版本合格时直接复用，并继续补装缺失的 OCR/NER 组件。
+REUSE_VENV=0
+PYTHON=""
+if [ -x "$VENV_DIR/bin/python" ]; then
+    if python_is_compatible "$VENV_DIR/bin/python"; then
+        REUSE_VENV=1
+        PYTHON="$VENV_DIR/bin/python"
+        if core_is_ready "$PYTHON" && ocr_is_ready "$PYTHON" && ai_is_ready "$PYTHON"; then
+            ok "全部环境已就绪：$($PYTHON --version 2>&1)"
+            exit 0
+        fi
+        info "复用现有环境并补装缺失组件：$($PYTHON --version 2>&1)"
+    else
+        backup_venv || exit 1
+    fi
 fi
 
-# ── 1. 查找可用 Python ────────────────────────────────────────
-PYTHON=""
-for candidate in python3.12 python3.11 python3.10 python3.9 python3; do
-    if command -v "$candidate" &>/dev/null 2>&1; then
-        if "$candidate" -c "import sys; sys.exit(0 if sys.version_info >= (3,9) else 1)" 2>/dev/null; then
-            PYTHON="$candidate"
+# 查找 Python 3.10+。不再使用 macOS 命令行工具自带的 Python 3.9。
+if [ "$REUSE_VENV" -eq 0 ]; then
+    for candidate in python3.12 python3.11 python3.10 python3; do
+        if command -v "$candidate" >/dev/null 2>&1 && python_is_compatible "$candidate"; then
+            PYTHON="$(command -v "$candidate")"
             break
         fi
-    fi
-done
+    done
+fi
 
-# ── 2. 没有 Python → 自动获取 ───────────────────────────────
-if [ -z "$PYTHON" ]; then
-    # 尝试 uv（无需管理员权限，自带 Python 下载能力）
-    UV_BIN=""
-    if command -v uv &>/dev/null; then
-        UV_BIN="uv"
-    elif [ -f "$HOME/.local/bin/uv" ]; then
+UV_BIN=""
+find_uv() {
+    if command -v uv >/dev/null 2>&1; then
+        UV_BIN="$(command -v uv)"
+    elif [ -x "$HOME/.local/bin/uv" ]; then
         UV_BIN="$HOME/.local/bin/uv"
+    elif [ -x "$HOME/.cargo/bin/uv" ]; then
+        UV_BIN="$HOME/.cargo/bin/uv"
     fi
+}
 
+if [ "$REUSE_VENV" -eq 0 ] && [ -z "$PYTHON" ]; then
+    info "未找到 Python 3.10+，将自动安装独立 Python 3.11"
+    find_uv
     if [ -z "$UV_BIN" ]; then
-        info "未找到 Python，正在安装 uv 工具（约 10MB，无需管理员权限）..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path >> "$LOG" 2>&1
-        UV_BIN="$HOME/.local/bin/uv"
-        if [ ! -f "$UV_BIN" ]; then
-            # macOS ARM path
-            UV_BIN="$HOME/.cargo/bin/uv"
+        info "正在安装 uv（无需管理员权限）"
+        if ! curl -LsSf https://astral.sh/uv/install.sh 2>> "$LOG" | sh -s -- --no-modify-path >> "$LOG" 2>&1; then
+            err "uv 安装失败，可能是网络无法访问安装源"
+            err "请手动安装 Python 3.11 后重试，详情见 .setup.log"
+            exit 1
         fi
+        find_uv
     fi
-
-    if [ -f "$UV_BIN" ]; then
-        ok "uv 已就绪"
-        info "正在下载 Python 3.11（首次约需 1-2 分钟）..."
-        "$UV_BIN" python install 3.11 >> "$LOG" 2>&1
-        PYTHON=$("$UV_BIN" python find 3.11 2>/dev/null)
-        if [ -z "$PYTHON" ]; then
-            # uv managed python 路径
-            PYTHON=$(ls "$HOME/.local/share/uv/python/"python3.11*/bin/python3 2>/dev/null | head -1)
-        fi
+    if [ -z "$UV_BIN" ]; then
+        err "uv 已下载但未找到可执行文件"
+        exit 1
     fi
-
-    # uv 失败 → 尝试 Homebrew
-    if [ -z "$PYTHON" ]; then
-        if command -v brew &>/dev/null; then
-            info "通过 Homebrew 安装 Python 3.11..."
-            brew install python@3.11 >> "$LOG" 2>&1
-            PYTHON="python3.11"
-        fi
+    if ! "$UV_BIN" python install 3.11 >> "$LOG" 2>&1; then
+        err "Python 3.11 下载失败，请检查网络或查看 .setup.log"
+        exit 1
     fi
+    PYTHON="$("$UV_BIN" python find 3.11 2>> "$LOG")"
+fi
 
-    if [ -z "$PYTHON" ]; then
-        err "无法自动安装 Python。请前往 https://www.python.org 下载安装后重试。"
-        echo ""
-        read -p "  按回车键退出..." 2>/dev/null || true
+if [ -z "$PYTHON" ] || ! python_is_compatible "$PYTHON"; then
+    err "未能获取 Python 3.10+"
+    exit 1
+fi
+ok "使用 $($PYTHON --version 2>&1)"
+
+if [ "$REUSE_VENV" -eq 0 ]; then
+    info "创建独立运行环境"
+    if ! "$PYTHON" -m venv "$VENV_DIR" >> "$LOG" 2>&1; then
+        err "虚拟环境创建失败，详情见 .setup.log"
         exit 1
     fi
 fi
+VENV_PYTHON="$VENV_DIR/bin/python"
 
-ok "Python: $($PYTHON --version 2>&1)"
-
-# ── 3. 创建虚拟环境 ───────────────────────────────────────────
-if [ -z "$SKIP_VENV_CREATE" ]; then
-    info "创建独立运行环境..."
-    "$PYTHON" -m venv "$VENV_DIR" >> "$LOG" 2>&1
+info "更新安装工具"
+if ! "$VENV_PYTHON" -m pip install --upgrade pip setuptools wheel >> "$LOG" 2>&1; then
+    err "pip 更新失败，详情见 .setup.log"
+    exit 1
 fi
-PIP="$VENV_DIR/bin/pip"
-ok "运行环境就绪"
 
-# ── 4. 安装依赖 ───────────────────────────────────────────────
 echo ""
-info "安装依赖包（首次约需 3-5 分钟，请耐心等待）..."
-"$PIP" install --upgrade pip -q >> "$LOG" 2>&1
-
-REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
-if [ -f "$REQUIREMENTS" ]; then
-    "$PIP" install -r "$REQUIREMENTS" -q >> "$LOG" 2>&1
-else
-    "$PIP" install flask pymupdf python-docx pillow reportlab chardet paddleocr -q >> "$LOG" 2>&1
+info "1/3 安装核心组件（网页、PDF、Word）"
+if ! "$VENV_PYTHON" -m pip install -r "$SCRIPT_DIR/requirements-core.txt" >> "$LOG" 2>&1; then
+    err "核心组件安装失败，工具不会强行启动"
+    err "请查看 .setup.log 中最后的 ERROR"
+    exit 1
 fi
-ok "依赖安装完成"
+if ! core_is_ready "$VENV_PYTHON"; then
+    err "核心组件验证失败，详情见 .setup.log"
+    exit 1
+fi
+ok "核心组件已就绪"
 
-# ── 5. 验证安装 ───────────────────────────────────────────────
-echo ""
-if "$VENV_DIR/bin/python" -c "import flask, fitz, docx" 2>/dev/null; then
-    ok "核心组件验证通过"
+OCR_READY=0
+info "2/3 安装 RapidOCR（扫描 PDF/图片）"
+if "$VENV_PYTHON" -m pip install -r "$SCRIPT_DIR/requirements-ocr.txt" >> "$LOG" 2>&1 \
+   && ocr_is_ready "$VENV_PYTHON"; then
+    OCR_READY=1
+    ok "RapidOCR 已就绪"
 else
-    err "部分依赖未成功安装，详情见 .setup.log"
+    warn "RapidOCR 安装失败；Word/文字 PDF 仍可使用，扫描件 OCR 暂不可用"
+    warn "具体原因见 .setup.log"
 fi
 
-# ── 6. 确保目录结构 ───────────────────────────────────────────
+AI_READY=0
+info "3/3 安装中文 NER 运行时"
+if "$VENV_PYTHON" -m pip install -r "$SCRIPT_DIR/requirements-ai.txt" >> "$LOG" 2>&1 \
+   && ai_is_ready "$VENV_PYTHON"; then
+    AI_READY=1
+    ok "中文 NER 运行时已就绪"
+else
+    warn "NER 运行时安装失败；工具仍可使用规则识别"
+    warn "具体原因见 .setup.log"
+fi
+
 mkdir -p "$SCRIPT_DIR/inbox" "$SCRIPT_DIR/output" "$SCRIPT_DIR/uploads"
+cat > "$SCRIPT_DIR/.setup_status" <<EOF
+PYTHON_VERSION=$($VENV_PYTHON -c 'import platform; print(platform.python_version())')
+CORE_READY=1
+OCR_READY=$OCR_READY
+AI_READY=$AI_READY
+EOF
 
-# ── 完成 ─────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}  ════════════════════════════════════════"
-echo -e "    安装完成！正在启动..."
-echo -e "  ════════════════════════════════════════${NC}"
+ok "基础环境安装成功"
+if [ "$OCR_READY" -eq 0 ] || [ "$AI_READY" -eq 0 ]; then
+    warn "部分高级功能未安装，但不再影响网页工具启动"
+fi
 echo ""
+exit 0

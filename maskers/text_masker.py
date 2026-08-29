@@ -36,9 +36,10 @@ class TextMasker:
     def __init__(self):
         self.mapping = {}  # 原始值 -> 占位符
         self.reverse_mapping = {}  # 占位符 -> 原始值
+        self.mapping_metadata = {}  # (类型, 原文) -> 简称关联等附加信息
         self.counter = defaultdict(int)
         self.replacement_log = []
-        self.abbreviation_map = {}  # 简称 -> 全称
+        self.abbreviation_map = {}  # 简称 -> 全称（两者使用关联但不同的占位符）
         self.placeholder_style = 'english_bracket'  # 默认风格
         # 默认英文模板的副本，切回 english_bracket 时复原用
         self._default_templates = None  # 在 placeholder_templates 定义后填充
@@ -332,8 +333,33 @@ class TextMasker:
         return '*' * len(text)
 
     def set_abbreviation_map(self, abbrev_map: dict):
-        """设置简称→全称映射，使简称与全称共享同一占位符"""
+        """设置简称→全称映射，使简称生成与全称关联的独立占位符。"""
         self.abbreviation_map = abbrev_map or {}
+
+    def _build_abbreviation_placeholder(self, full_placeholder: str, ordinal: int = 1) -> str:
+        """根据全称占位符生成简称占位符，但不复用全称占位符。
+
+        示例：
+          [COMPANY_1] -> [COMPANY_1_ABBR]
+          <公司1>      -> <公司1简化名>
+          〔公司1〕    -> 〔公司1简化名〕
+          A公司        -> A公司简化名
+        同一全称有多个简称时，后续简称会追加序号。
+        """
+        if ordinal <= 1:
+            chinese_suffix = '简化名'
+            english_suffix = '_ABBR'
+        else:
+            chinese_suffix = f'简化名{ordinal}'
+            english_suffix = f'_ABBR_{ordinal}'
+
+        if full_placeholder.startswith('[') and full_placeholder.endswith(']'):
+            return f'{full_placeholder[:-1]}{english_suffix}]'
+        if full_placeholder.startswith('<') and full_placeholder.endswith('>'):
+            return f'{full_placeholder[:-1]}{chinese_suffix}>'
+        if full_placeholder.startswith('〔') and full_placeholder.endswith('〕'):
+            return f'{full_placeholder[:-1]}{chinese_suffix}〕'
+        return f'{full_placeholder}{chinese_suffix}'
 
     def _mask_placeholder(self, text: str, entity_type: str) -> str:
         """
@@ -348,19 +374,74 @@ class TextMasker:
         """
         key = (entity_type, text)
         if key not in self.mapping:
-            # 检查是否为简称，若是则复用全称的占位符
+            # 简称与全称保持关联，但必须使用不同占位符，避免还原时
+            # 把简称错误恢复成全称。例如：〔公司1〕/〔公司1简化名〕。
             if text in self.abbreviation_map:
                 full_name = self.abbreviation_map[text]
                 full_key = (entity_type, full_name)
-                if full_key in self.mapping:
-                    self.mapping[key] = self.mapping[full_key]
-                    return self.mapping[key]
-            self.counter[entity_type] += 1
+                if full_key not in self.mapping:
+                    # 正常情况下全称更长，会先被分配占位符；此兜底保证
+                    # 单独处理简称时仍能生成稳定、可关联的占位符。
+                    self._mask_placeholder(full_name, entity_type)
+                full_placeholder = self.mapping[full_key]
+                ordinal = 1
+                while True:
+                    placeholder = self._build_abbreviation_placeholder(
+                        full_placeholder, ordinal
+                    )
+                    owner = self.reverse_mapping.get(placeholder)
+                    if owner is None or owner == key:
+                        break
+                    ordinal += 1
+                self.mapping[key] = placeholder
+                self.reverse_mapping[placeholder] = key
+                self.mapping_metadata[key] = {
+                    'is_abbreviation': True,
+                    'full_name': full_name,
+                    'full_placeholder': full_placeholder,
+                }
+                return placeholder
             template = self.placeholder_templates.get(entity_type, self.placeholder_templates['unknown'])
-            placeholder = template.format(self.counter[entity_type])
+            # 批次处理会预先载入旧映射。生成新占位符时必须同时
+            # 检查全局反向映射，避免 address/full_address 等共用模板时冲突。
+            while True:
+                self.counter[entity_type] += 1
+                placeholder = template.format(self.counter[entity_type])
+                if placeholder not in self.reverse_mapping:
+                    break
             self.mapping[key] = placeholder
             self.reverse_mapping[placeholder] = (entity_type, text)
         return self.mapping[key]
+
+    def seed_mapping(self, mapping_data: Dict):
+        """预载已有的占位符映射，用于批次间和多轮补充脱敏。
+
+        支持工具导出的 ``{placeholder: {type, original}}`` 格式，
+        也支持外层包含 ``mapping`` 字段的完整字典。
+        """
+        if not isinstance(mapping_data, dict):
+            return
+        if isinstance(mapping_data.get('mapping'), dict):
+            mapping_data = mapping_data['mapping']
+
+        for placeholder, info in mapping_data.items():
+            if isinstance(info, dict):
+                entity_type = info.get('type', 'unknown')
+                original = info.get('original', '')
+            else:
+                entity_type = 'unknown'
+                original = str(info or '')
+            if not placeholder or not original:
+                continue
+            key = (entity_type, original)
+            self.mapping[key] = placeholder
+            self.reverse_mapping[placeholder] = key
+            if isinstance(info, dict) and info.get('is_abbreviation'):
+                self.mapping_metadata[key] = {
+                    'is_abbreviation': True,
+                    'full_name': info.get('full_name', ''),
+                    'full_placeholder': info.get('full_placeholder', ''),
+                }
 
     def mask(self, text: str, entity_type: str) -> str:
         """
@@ -386,7 +467,12 @@ class TextMasker:
         else:
             return self._mask_placeholder(text, entity_type)
 
-    def mask_all(self, text: str, entities: List[Tuple[str, str, int]]) -> Tuple[str, Dict]:
+    def mask_all(
+        self,
+        text: str,
+        entities: List[Tuple[str, str, int]],
+        preserve_mapping: bool = False,
+    ) -> Tuple[str, Dict]:
         """
         批量掩码文本中的所有实体
 
@@ -397,9 +483,11 @@ class TextMasker:
         Returns:
             (掩码后文本, 详细映射信息)
         """
-        self.mapping = {}
-        self.reverse_mapping = {}
-        self.counter = defaultdict(int)
+        if not preserve_mapping:
+            self.mapping = {}
+            self.reverse_mapping = {}
+            self.mapping_metadata = {}
+            self.counter = defaultdict(int)
         self.replacement_log = []
 
         result = text
@@ -450,10 +538,19 @@ class TextMasker:
         mapping_result = {}
         for (etype, original), placeholder in self.mapping.items():
             if placeholder not in mapping_result:
-                mapping_result[placeholder] = {
+                entry = {
                     'type': etype,
                     'original': original
                 }
+                entry.update(self.mapping_metadata.get((etype, original), {}))
+                if original in self.abbreviation_map:
+                    full_name = self.abbreviation_map[original]
+                    entry.update({
+                        'is_abbreviation': True,
+                        'full_name': full_name,
+                        'full_placeholder': self.mapping.get((etype, full_name), ''),
+                    })
+                mapping_result[placeholder] = entry
 
         detailed_mapping = {
             "metadata": {
@@ -470,13 +567,23 @@ class TextMasker:
         """获取简化版映射表"""
         result = {}
         for (etype, original), placeholder in self.mapping.items():
-            result[placeholder] = {'type': etype, 'original': original}
+            entry = {'type': etype, 'original': original}
+            entry.update(self.mapping_metadata.get((etype, original), {}))
+            if original in self.abbreviation_map:
+                full_name = self.abbreviation_map[original]
+                entry.update({
+                    'is_abbreviation': True,
+                    'full_name': full_name,
+                    'full_placeholder': self.mapping.get((etype, full_name), ''),
+                })
+            result[placeholder] = entry
         return result
 
     def reset(self):
         """重置状态"""
         self.mapping = {}
         self.reverse_mapping = {}
+        self.mapping_metadata = {}
         self.counter = defaultdict(int)
         self.replacement_log = []
         self.abbreviation_map = {}

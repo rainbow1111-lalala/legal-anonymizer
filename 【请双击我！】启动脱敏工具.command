@@ -18,7 +18,8 @@ echo ""
 # ── 确定 Python 路径 ─────────────────────────────────────────
 VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
 
-if [ -f "$VENV_PYTHON" ] && "$VENV_PYTHON" -c "import flask, fitz, docx" 2>/dev/null; then
+if [ -x "$VENV_PYTHON" ] \
+   && "$VENV_PYTHON" -c "import sys; assert sys.version_info >= (3,10); import flask, fitz, docx, PIL, reportlab" 2>/dev/null; then
     # 已安装好，直接用
     PYTHON_CMD="$VENV_PYTHON"
 else
@@ -26,29 +27,24 @@ else
     echo "  首次运行，正在自动配置环境..."
     echo "  （约需 3-5 分钟，仅此一次，请耐心等待）"
     echo ""
-    bash "$SCRIPT_DIR/setup.sh"
-
-    if [ -f "$VENV_PYTHON" ]; then
-        PYTHON_CMD="$VENV_PYTHON"
-    else
-        # 退回系统 Python（不推荐，但可运行）
-        for cmd in python3 python; do
-            if command -v $cmd &>/dev/null && $cmd -c "import sys; sys.exit(0 if sys.version_info>=(3,9) else 1)" 2>/dev/null; then
-                PYTHON_CMD=$cmd
-                break
-            fi
-        done
-        if [ -z "$PYTHON_CMD" ]; then
-            echo ""
-            echo "  ✗ 环境安装失败。请访问 https://www.python.org 安装 Python 后重试。"
-            echo ""
-            read -p "  按回车键退出..." 2>/dev/null || true
-            exit 1
-        fi
+    if ! bash "$SCRIPT_DIR/setup.sh"; then
+        echo ""
+        echo "  ✗ 环境安装未完成，服务不会强行启动。"
+        echo "  请查看项目目录下的 .setup.log。"
+        echo ""
+        read -p "  按回车键退出..." 2>/dev/null || true
+        exit 1
     fi
+    PYTHON_CMD="$VENV_PYTHON"
 fi
 
-echo "  ✓ 运行环境就绪"
+if ! "$PYTHON_CMD" -c "import sys; assert sys.version_info >= (3,10); import flask, fitz, docx, PIL, reportlab" 2>/dev/null; then
+    echo ""
+    echo "  ✗ 核心环境验证失败，请重新运行安装。"
+    read -p "  按回车键退出..." 2>/dev/null || true
+    exit 1
+fi
+echo "  ✓ 运行环境就绪（$($PYTHON_CMD --version 2>&1)）"
 
 # ── 创建必要目录 ──────────────────────────────────────────────
 mkdir -p "$SCRIPT_DIR/inbox" "$SCRIPT_DIR/output" "$SCRIPT_DIR/uploads"
@@ -95,8 +91,10 @@ export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 # ── 预下载 AI 模型（首次启动）─────────────────────────────────────
 # 中文 NER 是核心能力（提升 50%+ 检测准确度），强制预下载
 # OpenAI 模型仅在用户选择 y 时下载
-MODEL_FLAG="$SCRIPT_DIR/.models_downloaded"
-if [ ! -f "$MODEL_FLAG" ]; then
+CN_MODEL_FLAG="$SCRIPT_DIR/.cn_model_ready"
+EN_MODEL_FLAG="$SCRIPT_DIR/.en_model_ready"
+if "$PYTHON_CMD" -c "import torch, transformers" >/dev/null 2>&1 \
+   && { [ ! -f "$CN_MODEL_FLAG" ] || { [ "$ENABLE_OPENAI" = "1" ] && [ ! -f "$EN_MODEL_FLAG" ]; }; }; then
     echo ""
     echo "  ╔══════════════════════════════════════════════╗"
     echo "  ║       下载 AI 模型（首次仅一次）             ║"
@@ -107,7 +105,7 @@ if [ ! -f "$MODEL_FLAG" ]; then
     echo "  请耐心等待 1-3 分钟（取决于您的网速）"
     echo ""
 
-    "$PYTHON_CMD" -c "
+    if "$PYTHON_CMD" -c "
 import os
 os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
 print('  → 拉取中文 NER 模型 (uer/roberta-base-finetuned-cluener2020-chinese)...', flush=True)
@@ -115,13 +113,17 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 AutoTokenizer.from_pretrained('uer/roberta-base-finetuned-cluener2020-chinese')
 AutoModelForTokenClassification.from_pretrained('uer/roberta-base-finetuned-cluener2020-chinese')
 print('  ✓ 中文 NER 模型下载完成', flush=True)
-" 2>&1 | tail -20
+"; then
+        touch "$CN_MODEL_FLAG"
+    else
+        echo "  ! 中文 NER 模型下载失败，本次将使用规则识别。"
+    fi
 
     if [ "$ENABLE_OPENAI" = "1" ]; then
         echo ""
         echo "  正在下载英文模型（约 2.6 GB，请耐心等待 5-15 分钟）..."
         echo ""
-        "$PYTHON_CMD" -c "
+        if "$PYTHON_CMD" -c "
 import os
 os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
 print('  → 拉取英文 PII 模型 (openai/privacy-filter)...', flush=True)
@@ -129,13 +131,19 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 AutoTokenizer.from_pretrained('openai/privacy-filter')
 AutoModelForTokenClassification.from_pretrained('openai/privacy-filter')
 print('  ✓ 英文模型下载完成', flush=True)
-" 2>&1 | tail -20
+"; then
+            touch "$EN_MODEL_FLAG"
+        else
+            echo "  ! 英文模型下载失败，英文隐私识别暂不可用。"
+        fi
     fi
-
-    # 标记已下载（避免重复检查）
-    touch "$MODEL_FLAG"
     echo ""
-    echo "  ✓ 所有模型已就绪。以后启动会直接进入网页界面。"
+    echo "  模型检查完成。"
+    echo ""
+elif ! "$PYTHON_CMD" -c "import torch, transformers" >/dev/null 2>&1; then
+    echo ""
+    echo "  ! NER 运行时未安装，本次启动使用规则识别。"
+    echo "  ! 可重新运行 setup.sh 补充安装。"
     echo ""
 fi
 

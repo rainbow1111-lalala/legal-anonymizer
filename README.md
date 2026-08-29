@@ -1,7 +1,7 @@
 # Legal Anonymizer · 法律文档脱敏工具
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-green.svg)](https://www.python.org)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-green.svg)](https://www.python.org)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)]()
 [![Offline](https://img.shields.io/badge/Network-100%25%20Offline-success.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-orange.svg)]()
@@ -29,6 +29,11 @@ Built for lawyers, paralegals, and compliance teams who need to redact sensitive
 - **Dual OCR engines** — RapidOCR (fast, lightweight) by default; switch to PaddleOCR for complex layouts
 - **Chinese-English mixed documents** — handles bilingual legal filings, cross-border contracts, international arbitration materials
 - **Web UI + CLI** — drag-and-drop browser interface, or batch-process via command line
+- **Batch review and multi-round redaction** — one batch is analyzed first, reviewed by a human, then redacted; missed terms can be added later and placeholder numbering stays stable across V1/V2/V3
+- **Batch restore dictionary** — a batch shares one cumulative mapping, so redacted files can be restored in bulk to Word
+- **Linked full-name / short-name placeholders** — declarations such as "hereinafter referred to as" are detected, and the short name gets its own placeholder linked to the full name (e.g. `[COMPANY_1]` and `[COMPANY_1_ABBR]`), so a restore returns each to its own original wording
+
+> The batch restore dictionary contains every original sensitive value. It is deliberately kept out of the results zip and must be downloaded separately; keep it on your own machine and never send it together with the redacted files.
 
 ### Quick Start
 
@@ -143,6 +148,22 @@ Apache License 2.0 — see [LICENSE](LICENSE).
 - 🔍 **双 OCR 引擎**：默认 RapidOCR（快、轻量），复杂排版可切 PaddleOCR
 - 🇨🇳 **中文友好**：复姓识别（欧阳/万俟/诸葛/皇甫/司马/上官）、PDF 排版换行自动合并
 - 🌐 **网页 + 命令行**：拖拽上传可视化操作，或 CLI 批处理，皆可
+- 🗂️ **批量与多轮补充脱敏**：同一批次可反复追加遗漏词，V1/V2/V3 占位符编号保持稳定
+- 📖 **批次还原字典**：一个批次使用一份累计映射，可批量还原并统一输出 Word
+- 🔗 **全称—简称关联脱敏**：识别“以下简称/下称/简称”等声明；全称与简称使用关联但不同的占位符（如 `〔公司1〕`、`〔公司1简化名〕`），还原时分别恢复原文
+
+### 批量多轮脱敏与还原
+
+1. 切换到「批量处理」，选择多个文件。
+2. 选择是否启用中文 NER / 英文隐私识别，并可输入本批次自定义敏感词。
+3. 点击「识别并进入人工检查」；系统只生成识别清单，此时不改写文件。
+4. 在「批次统一人工检查」中复核所有文件合并后的敏感项：相同“类型＋词汇”只显示一次，并标注涉及文件数、出现次数和示例上下文。编辑、删除或人工补充均应用于整个批次，无需在文件间切换。
+5. 在独立的「全称—简称对应检查」中确认、编辑或删除对应关系；全称与简称仍使用关联但不同的占位符。
+6. 确认总表后再开始批量脱敏。如果第一轮结果仍有遗漏，点击「发现遗漏，继续脱敏」生成 V2/V3。
+7. 添加的词条会追加到当前批次词典；系统从原文件生成下一版，旧占位符不重新编号。
+8. 「下载脱敏成果（zip）」只包含脱敏后的文件，不含还原字典；还原字典用「单独下载还原字典」按钮单独取回，再到「脱敏还原」批量生成 Word ZIP。
+
+> 还原字典包含全部敏感原文，等同于一份明文对照表。工具刻意不把它打进成果 zip，请只留在本机，不要与脱敏文件一起发给无权接收人。
 
 ### 快速开始（推荐）
 
@@ -159,7 +180,7 @@ Apache License 2.0 — see [LICENSE](LICENSE).
 
 ### 手动安装
 
-**第一步：确认有 Python 3.9+**
+**第一步：确认有 Python 3.10+**
 
 ```bash
 python3 --version   # macOS
@@ -268,7 +289,7 @@ python3 cli.py anonymize input.docx -o output.docx --cn-llm --llm
 端口被占用，程序会自动尝试 8080-8099。仍失败则关掉占用端口的其他程序。
 
 **报错 `ModuleNotFoundError: No module named 'flask'`**  
-依赖未装成功，重新执行：`python3 -m pip install -r requirements.txt`
+依赖未装成功时，优先重新执行 `bash setup.sh`。安装器会验证 Python 版本和核心组件，并将 OCR、NER 分组安装；详情记录在 `.setup.log`。不要使用 macOS 命令行工具自带的 Python 3.9，因为新版 OCR/NER 依赖已不再提供对应安装包。
 
 ### 贡献
 

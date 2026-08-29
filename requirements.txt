@@ -1,29 +1,14 @@
 # Legal Document Anonymizer - Requirements
 # 法律文档脱敏工具 - 依赖包
 
-# Core dependencies (required)
-# 核心依赖（必需）
-pymupdf>=1.23.0        # PyMuPDF for PDF processing - PDF处理
-python-docx>=1.1.0      # Word document processing - Word文档处理
-reportlab>=4.0.0        # PDF generation - PDF生成
-flask>=3.0.0            # Web UI - 网页界面
+# Python 3.10+ 的标准安装：核心 + RapidOCR + NER 运行时。
+-r requirements-core.txt
+-r requirements-ocr.txt
+-r requirements-ai.txt
 
-# Optional dependencies (for advanced features)
-# 可选依赖（高级功能）
-pillow>=10.0.0          # Image processing for OCR - 图像处理（OCR用）
-numpy>=1.21.0           # Array processing for PaddleOCR - 数组处理
-
-# OCR engines (install at least one)
-# OCR引擎（至少安装一个）
-paddlepaddle>=3.0.0     # PaddlePaddle deep learning framework (recommended) - 飞桨深度学习框架（推荐）
-paddleocr>=3.0.0        # PaddleOCR - high accuracy Chinese OCR (recommended) - 高精度中文OCR（推荐）
-pytesseract>=0.3.10     # Tesseract OCR fallback - Tesseract OCR备选
-
-# Visual redaction for scanned PDFs (required to preserve original page images)
-# 扫描版 PDF 视觉脱敏必装：保留盖章/签名/版式，只覆盖白框/占位符
-# 没装这两个的话，扫描版 PDF 会回退到模板渲染（仿宋小四），原版式丢失
-rapidocr>=3.8.0         # RapidOCR - returns char-level bbox - 字符级位置框
-onnxruntime>=1.20.0     # RapidOCR ONNX backend - 推理后端
+# PaddleOCR 体积大且对系统/Python 组合更挑剔，不再阻塞默认安装。
+# 如确需复杂扫描件模式，可在环境就绪后单独执行：
+#   python -m pip install "paddlepaddle>=3" "paddleocr>=3"
 
 # LLM-based PII detectors (optional)
 # 可选：补充检测层，补规则盲区。三层各自独立开启，互不冲突

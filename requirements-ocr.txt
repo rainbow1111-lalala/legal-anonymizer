@@ -1,0 +1,6 @@
+# 默认轻量 OCR。onnxruntime 1.20+ 不支持 macOS Python 3.9，
+# 项目已统一要求 Python 3.10+。
+rapidocr>=3.0,<4
+onnxruntime>=1.20,<2
+pytesseract>=0.3.10,<1
+
