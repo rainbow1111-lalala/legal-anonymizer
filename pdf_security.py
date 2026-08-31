@@ -12,10 +12,15 @@ from typing import Dict, List, Optional, Tuple
 def _load_pdf_runtime():
     try:
         import fitz
-        from PIL import Image
         import processors.file_processor as fp_module
     except Exception:
         return None, None, None
+
+    try:
+        from PIL import Image
+    except Exception:
+        Image = None
+
     return fitz, Image, fp_module
 
 
